@@ -1,0 +1,26 @@
+model_params:
+  coordinates_per_point: 3
+  hidden_dim: 512
+  model_class: ArchFormRegressor
+  num_layers: 4
+  num_teeth: 28
+  points_per_tooth: 5
+train_params:
+  batch_size: 128
+  comment: Auto-generated training config on 2025-05-27 11:07:57
+  dataset: data/dataset_arch_regression.pth
+  device: cuda
+  loss_fn: L1Loss
+  lr: 0.001
+  num_epochs: 500
+  optimizer: Adam
+  patience: 50
+  scheduler:
+    class: ReduceLROnPlateau
+    factor: 0.8
+    mode: min
+    patience: 20
+    verbose: true
+  train_val_split:
+  - 0.8
+  - 0.2
