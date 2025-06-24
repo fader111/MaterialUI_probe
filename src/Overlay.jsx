@@ -81,21 +81,61 @@ function MenuBar() {
   )
 }
 
-function LeftPanel({ onRotate }) {
+function LeftPanel({ onShortRootsToggle, shortRoots, onLandmarksToggle, showLandmarks, onPredictT2 }) {
+  const buttons = [
+    {
+      key: 'roots',
+      label: shortRoots ? 'Long Roots' : 'Short Roots',
+      onClick: onShortRootsToggle
+    },
+    {
+      key: 'landmarks',
+      label: showLandmarks ? 'Hide Landmarks' : 'Show Landmarks',
+      onClick: onLandmarksToggle
+    },
+    {
+      key: 'predict',
+      label: 'Predict T2',
+      onClick: onPredictT2
+    }
+  ];
   return (
-    <Box sx={{ width: 120, bgcolor: 'rgba(245,245,245,0.5)', height: '100%', p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-      {/* <Typography variant="subtitle1">Left Tools</Typography> */}
-      <Button variant="contained" size="small" onClick={onRotate} title="Rotate the cube">
-        <RotateLeftIcon />
-      </Button>
-      <Button variant="outlined" size="small" title="Shuffle (not implemented)">
-        <ShuffleIcon />
-      </Button>
-      <Button variant="text" size="small" title="Reset (not implemented)">
-        <RestartAltIcon />
-      </Button>
+    <Box sx={{ width: 140, bgcolor: 'rgba(245,245,245,0.5)', height: 'auto', p: 1, display: 'flex', flexDirection: 'column', gap: 1, alignItems: 'center', borderRadius: 2 }}>
+      {buttons.map(btn => (
+        <Button
+          key={btn.key}
+          variant="text"
+          size="small"
+          title={btn.label}
+          onClick={btn.onClick}
+          disableRipple
+          disableFocusRipple
+          sx={{
+            minWidth: 0,
+            p: 1,
+            borderRadius: 2,
+            background: 'none',
+            boxShadow: 'none',
+            width: '100%',
+            height: 36,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            border: 'none',
+            outline: 'none',
+            fontWeight: 400,
+            fontSize: 12,
+            color: '#0e83f1',
+            '&:focus': { border: 'none', outline: 'none' },
+            '&:active': { border: 'none', outline: 'none' },
+            '&:hover': { border: 'none', outline: 'none', background: 'rgba(14,131,241,0.08)' },
+          }}
+        >
+          {btn.label}
+        </Button>
+      ))}
     </Box>
-  )
+  );
 }
 
 function RightPanel({ onViewSelect }) {
@@ -117,22 +157,39 @@ function RightPanel({ onViewSelect }) {
           size="small"
           title={view.label}
           onClick={() => {
-            // console.log('DEBUG2!!!: RightPanel button click', view.key, 'onViewSelect', onViewSelect);
             if (onViewSelect) {
-              // console.log('DEBUG: RightPanel button click', view.key);
               onViewSelect(view.key);
             }
           }}
-          sx={{ minWidth: 0, p: 0.5, borderRadius: 2, background: 'none', boxShadow: 'none', width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          disableRipple
+          disableFocusRipple
+          sx={{
+            minWidth: 0,
+            p: 0.5,
+            borderRadius: 2,
+            background: 'none',
+            boxShadow: 'none',
+            width: 40,
+            height: 40,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            border: 'none',
+            outline: 'none',
+            '&:focus': { border: 'none', outline: 'none' },
+            '&:active': { border: 'none', outline: 'none' },
+            '&:hover': { border: 'none', outline: 'none', background: 'rgba(255,255,255,0.08)' },
+          }}
         >
-          <img src={view.img} alt={view.label} style={{ width: 30, height: 30, objectFit: 'contain', borderRadius: 4, background: 'none', boxShadow: 'none' }} />
+          <img src={view.img} alt={view.label} style={{ width: 30, height: 30, objectFit: 'contain', borderRadius: 4, background: 'none', boxShadow: 'none', border: 'none', outline: 'none' }} />
         </Button>
       ))}
     </Box>
   )
 }
 
-export default function Overlay({ children, onRotate, angle, onViewSelect }) {
+export default function Overlay({ children, angle, onViewSelect, onShortRootsToggle, shortRoots, onLandmarksToggle, showLandmarks, onPredictT2 }) {
+  // console.log('Overlay rendered with angle:', angle, 'showLandmarks:', showLandmarks);
   return (
     <Box sx={{ height: '100vh', width: '100vw', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1, overflow: 'hidden' }}>
       {/* Main content (scene) in the background */}
@@ -143,11 +200,21 @@ export default function Overlay({ children, onRotate, angle, onViewSelect }) {
       <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 2, pointerEvents: 'auto' }}>
         <MenuBar />
       </Box>
-      <Box sx={{ position: 'absolute', top: 64, left: 0, bottom: 0, zIndex: 2, display: 'flex', flexDirection: 'column', pointerEvents: 'none' }}>
-        <Box sx={{ pointerEvents: 'auto' }}><LeftPanel onRotate={onRotate} /></Box>
+      <Box sx={{ position: 'absolute', top: '50%', left: 20, transform: 'translateY(-60%)', zIndex: 2, display: 'flex', flexDirection: 'column', pointerEvents: 'none' }}>
+        <Box sx={{ pointerEvents: 'auto' }}>
+          <LeftPanel 
+            onShortRootsToggle={onShortRootsToggle}
+            shortRoots={shortRoots}
+            onLandmarksToggle={onLandmarksToggle}
+            showLandmarks={showLandmarks}
+            onPredictT2={onPredictT2}
+          />
+        </Box>
       </Box>
       <Box sx={{ position: 'absolute', top: '50%', right: 20, transform: 'translateY(-50%)', zIndex: 2, display: 'flex', flexDirection: 'column', pointerEvents: 'none' }}>
-        <Box sx={{ pointerEvents: 'auto' }}><RightPanel onViewSelect={onViewSelect} /></Box>
+        <Box sx={{ pointerEvents: 'auto' }}>
+          <RightPanel onViewSelect={onViewSelect} />
+        </Box>
       </Box>
       {/* Bottom slider */}
       <Box sx={{ position: 'absolute', left: 0, right: 0, bottom: 16, zIndex: 2, pointerEvents: 'none', display: 'flex', justifyContent: 'center' }}>

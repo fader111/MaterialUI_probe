@@ -3,12 +3,7 @@ import './App.css'
 import Ortho from './Ortho'
 
 function App() {
-  // const [rotate, setRotate] = useState(false)
-  // const [angle, setAngle] = useState(0)
-  // const handleRotate = () => setRotate(r => !r)
-  // const handleAngleChange = (v) => setAngle(v)
   const [remountKey, setRemountKey] = useState(0);
-
   // Handle file loading with cleanup
   const handleFileLoaded = useCallback(() => {
     console.log('File loaded, forcing remount');
@@ -21,8 +16,6 @@ function App() {
   return (
     <div style={{ width: '100%', height: '100%'}}>
       <Ortho 
-        // rotate={rotate} 
-        // angle={angle} 
         key={remountKey} 
         onFileLoaded={handleFileLoaded}
       />

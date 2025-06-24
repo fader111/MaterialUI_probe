@@ -15,7 +15,9 @@ export const ToothPlacement = forwardRef((props, ref) => {
         stagingPatternsTrigger, 
         stagingType = "Case", 
         showMode: showModeProp = 2, // allow controlled showMode
-        onShowModeChange // callback for parent to control showMode
+        onShowModeChange, // callback for parent to control showMode
+        useShortRoots = false,
+        showLandmarks = true
     } = props;
 
     // console.log("ToothPlacement props.meshVersion:", props.meshVersion);
@@ -257,7 +259,6 @@ export const ToothPlacement = forwardRef((props, ref) => {
                 (showMode === 0 && toothID < 30) ||
                 (showMode === 1 && toothID > 30) ||
                 (showMode === 2) ||
-                // (showMode === 3 && toothID == 41) 
                 (showMode === 3) ||
                 (showMode === 4) ||
                 (showMode === 5) 
@@ -275,6 +276,8 @@ export const ToothPlacement = forwardRef((props, ref) => {
                         meshVersion={props.meshVersion}
                         isClicked={toothID === clickedToothId}
                         onToothClick={handleToothClick}
+                        useShortRoots={useShortRoots}
+                        showLandmarks={showLandmarks}
                     />
                 ) : null
             ))}

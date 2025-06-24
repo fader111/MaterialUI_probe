@@ -37,6 +37,9 @@ export default function Ortho(props) {
   const [orthoData, setOrthoData] = useState([]);
   const [controlsEnabled, setControlsEnabled] = useState(true);
   const [meshVersion, setMeshVersion] = useState(Date.now());
+  // New state for left panel
+  const [shortRoots, setShortRoots] = useState(false);
+  const [showLandmarks, setShowLandmarks] = useState(true);
 
   // Initial data fetch  
   useEffect(() => {
@@ -142,6 +145,18 @@ export default function Ortho(props) {
     setShowMode(mode);
   }, []);
 
+  // Handler for left panel
+  const handleShortRootsToggle = useCallback(() => setShortRoots(v => !v), []);
+  const handleLandmarksToggle = useCallback(() => setShowLandmarks(v => !v), []);
+  const handlePredictT2 = useCallback(() => {
+    // You can call a method on the ToothPlacement ref if needed
+    if (toothPlacementRef.current && toothPlacementRef.current.handlePredictT2) {
+      toothPlacementRef.current.handlePredictT2(() => {}, () => {});
+    } else {
+      alert('Predict T2 not implemented');
+    }
+  }, []);
+
   return (
     <div style={{ width: '100%', height: '100%' }}>
       <Overlay
@@ -153,15 +168,18 @@ export default function Ortho(props) {
             // console.log('DEBUG: Overlay onViewSelect called with undefined!');
           }
         }}
-        // ...other overlay props...
+        onShortRootsToggle={handleShortRootsToggle}
+        shortRoots={shortRoots}
+        onLandmarksToggle={handleLandmarksToggle}
+        showLandmarks={showLandmarks}
+        onPredictT2={handlePredictT2}
       >
         <Canvas
           camera={{ fov: 10, position: [0, 0, 20] }}
           onCreated={({ camera }) => setCamera(camera)}
           // shadows
         >
-          <Suspense fallback={<div>Loading...</div>}>
-          </Suspense>
+          <Suspense fallback={<div>Loading...</div>} />
           <ambientLight intensity={0.3} />
           {camera && <CameraFollowingLight camera={camera} />}
           <axesHelper args={[5]} />
@@ -171,13 +189,11 @@ export default function Ortho(props) {
             stage={stage}
             showMode={showMode}
             onShowModeChange={setShowMode}
-            // stagingType={stagingType}
-            // stagingPatterns={stagingPatterns}
-            // stagingPatternsTrigger={stagingPatternsTrigger}
             trackballControlsRef={controlsRef} 
             setControlsEnabled={setControlsEnabled}
-            // onStagingDataUpdate={handleStagingDataUpdate}
             meshVersion={meshVersion}
+            useShortRoots={shortRoots}
+            showLandmarks={showLandmarks}
           />
           <TrackballControls
             ref={controlsRef}

@@ -1,18 +1,13 @@
 import React from 'react';
 import { useLoader, useFrame } from '@react-three/fiber';
-import { TransformControls, Html } from '@react-three/drei'; // Add this import
-import { useRef, useState, useEffect, useCallback, useMemo, useContext } from 'react';
+import { TransformControls, Html } from '@react-three/drei';
+import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import * as THREE from 'three'
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader';
 import { TextureLoader } from 'three/src/loaders/TextureLoader'
 
-// export const Tooth = (props) => {
-export const Tooth = React.memo((props) => {  
-  const { toothID, url, stagingData, onTransform, landmarks, trackballControlsRef, isClicked, onToothClick } = props;
-  // const { useShortRoots, showBoltonLines, showLandmarks } = useContext(OrthoContext);
-  
-  let useShortRoots = false; // For testing purposes, you can set these to true or false as needed
-  let showLandmarks = true;
+export function Tooth(props) {  
+  const { toothID, url, stagingData, onTransform, landmarks, trackballControlsRef, isClicked, onToothClick, useShortRoots = false, showLandmarks = true } = props;
 
   const [hovered, hover] = useState(false);
   const toothRef = useRef(); 
@@ -27,7 +22,6 @@ export const Tooth = React.memo((props) => {
     `/roots/${toothID}.stl?ts=${props.meshVersion}`,
     loader => `${toothID}-root-${props.meshVersion}`
   );
-  // console.log("crown", crown);
   const texture = useLoader(TextureLoader, `/textures/teeth.png`);
 
   const position = stagingData.position;
@@ -47,8 +41,7 @@ export const Tooth = React.memo((props) => {
     map: texture,
     color: getColor({ clicked: isClicked, hovered }),
     transparent: true,
-    // opacity: showBoltonLines ? 0.5 : 1.0, // Make crown more transparent when Bolton lines are visible
-    opacity: 1.0 // Make crown more transparent when Bolton lines are visible
+    opacity: 1.0
   });
 
   const rootMaterial = new THREE.MeshStandardMaterial({
@@ -66,7 +59,6 @@ export const Tooth = React.memo((props) => {
 
   function LandMark({ lmType, color }) {
     const lmPoint = landmarks[lmType];
-
     return (
       <mesh position={lmPoint}>
         <sphereGeometry args={[0.2]} />
@@ -95,7 +87,6 @@ export const Tooth = React.memo((props) => {
       opacity: 0.6,
       linewidth: 1
     });
-
     return <line geometry={lineGeometry} material={lineMaterial} />;
   };
 
@@ -131,8 +122,6 @@ export const Tooth = React.memo((props) => {
       )}
     </group>
   );
-
-  // console.log("toothID", toothID, "meshContent", meshContent);
 
   const [isDragging, setIsDragging] = useState(false);
   const [initialTransform, setInitialTransform] = useState(null);
@@ -254,4 +243,4 @@ export const Tooth = React.memo((props) => {
       )}
     </>
   );
-});
+}
