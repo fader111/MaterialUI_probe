@@ -15,7 +15,7 @@ import PublishIcon from '@mui/icons-material/Publish'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import Slider from '@mui/material/Slider'
 
-function MenuBar() {
+function MenuBar({ onFileLoaded }) {
   const [anchorEls, setAnchorEls] = React.useState({})
   const menus = [
     { label: 'File', items: ['New', 'Open', 'Save', 'Exit'] },
@@ -38,6 +38,30 @@ function MenuBar() {
       setAnchorEls((prev) => Object.fromEntries([[last, prev[last]]]))
     }
   }, [anchorEls])
+
+  // --- Add Open handler ---
+  const handleOpenOAS = async () => {
+    // Open file dialog for .oas files
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.oas';
+    input.style.display = 'none';
+    document.body.appendChild(input);
+    input.click();
+    input.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      try {
+        const { exportTeeth } = await import('./api/exportTeeth');
+        await exportTeeth(file.name);
+        if (onFileLoaded) onFileLoaded(file.name);
+      } catch (err) {
+        console.error('Export failed:', err);
+      }
+      document.body.removeChild(input);
+    };
+  };
+
   return (
     <AppBar position="static" color="default" elevation={0} sx={{ pointerEvents: 'auto', boxShadow: 'none', bgcolor: 'rgba(255,255,255,0.5)' }}>
       <Toolbar variant="dense" sx={{ pointerEvents: 'auto', justifyContent: 'center' }}>
@@ -69,7 +93,14 @@ function MenuBar() {
               PaperProps={{ sx: { pointerEvents: 'auto' } }}
             >
               {menu.items.map((item) => (
-                <MenuItem key={item} onClick={() => handleMenuClose(menu.label)} sx={{ pointerEvents: 'auto' }}>
+                <MenuItem
+                  key={item}
+                  onClick={() => {
+                    handleMenuClose(menu.label);
+                    if (menu.label === 'File' && item === 'Open') handleOpenOAS();
+                  }}
+                  sx={{ pointerEvents: 'auto' }}
+                >
                   {item}
                 </MenuItem>
               ))}
@@ -188,8 +219,18 @@ function RightPanel({ onViewSelect }) {
   )
 }
 
-export default function Overlay({ children, angle, onViewSelect, onShortRootsToggle, shortRoots, onLandmarksToggle, showLandmarks, onPredictT2 }) {
-  // console.log('Overlay rendered with angle:', angle, 'showLandmarks:', showLandmarks);
+export default function Overlay({ children, stage, maxStage, onStageChange, onViewSelect, onShortRootsToggle, shortRoots, onLandmarksToggle, showLandmarks, onPredictT2, onFileLoaded }) {
+  const [status, setStatus] = React.useState('');
+  const [openedFile, setOpenedFile] = React.useState('');
+
+  // Provide a callback for MenuBar to update status and file name
+  const handleFileLoaded = async (filename) => {
+    setStatus('Loading...');
+    setOpenedFile(filename);
+    if (onFileLoaded) await onFileLoaded(filename);
+    setStatus('');
+  };
+
   return (
     <Box sx={{ height: '100vh', width: '100vw', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1, overflow: 'hidden' }}>
       {/* Main content (scene) in the background */}
@@ -198,7 +239,7 @@ export default function Overlay({ children, angle, onViewSelect, onShortRootsTog
       </Box>
       {/* Overlay UI panels */}
       <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 2, pointerEvents: 'auto' }}>
-        <MenuBar />
+        <MenuBar onFileLoaded={handleFileLoaded} />
       </Box>
       <Box sx={{ position: 'absolute', top: '50%', left: 20, transform: 'translateY(-60%)', zIndex: 2, display: 'flex', flexDirection: 'column', pointerEvents: 'none' }}>
         <Box sx={{ pointerEvents: 'auto' }}>
@@ -217,18 +258,23 @@ export default function Overlay({ children, angle, onViewSelect, onShortRootsTog
         </Box>
       </Box>
       {/* Bottom slider */}
-      <Box sx={{ position: 'absolute', left: 0, right: 0, bottom: 16, zIndex: 2, pointerEvents: 'none', display: 'flex', justifyContent: 'center' }}>
+      <Box sx={{ position: 'absolute', left: 0, right: 0, bottom: 48, zIndex: 2, pointerEvents: 'none', display: 'flex', justifyContent: 'center' }}>
         <Box sx={{ width: 300, pointerEvents: 'auto', borderRadius: 2, px: 2, py: 1 }}>
           <Slider
-            value={angle}
+            value={typeof stage === 'number' ? stage : 0}
             min={0}
-            max={360}
+            max={typeof maxStage === 'number' && maxStage > 0 ? maxStage : 1}
             step={1}
-            // onChange={(_, v) => onAngleChange(v)}
+            onChange={(_, v) => onStageChange && onStageChange(v)}
             valueLabelDisplay="auto"
-            aria-label="Cube Angulation"
+            aria-label="Stage Slider"
           />
         </Box>
+      </Box>
+      {/* Status bar */}
+      <Box sx={{ position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 3, height: 32, bgcolor: 'rgba(240,240,240,0.95)', borderTop: '1px solid #ccc', display: 'flex', alignItems: 'center', px: 2, fontSize: 15, color: '#333', pointerEvents: 'auto' }}>
+        <span style={{ fontWeight: 500, marginRight: 16 }}>File: {openedFile || 'None'}</span>
+        <span>Status: {status || 'Ready'}</span>
       </Box>
     </Box>
   )

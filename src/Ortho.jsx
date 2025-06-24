@@ -29,7 +29,8 @@ function CameraFollowingLight({ camera }) {
 }
 
 export default function Ortho(props) {
-  let [ stage, setStage ] = useState(0);
+  const [stage, setStage] = useState(0);
+  let [T2Stage, setT2Stage] = useState(0);
   const [camera, setCamera] = useState(null)
   const controlsRef = useRef(null);
   let [ showMode, setShowMode ] = useState(2); // <-- now controlled here
@@ -38,8 +39,8 @@ export default function Ortho(props) {
   const [controlsEnabled, setControlsEnabled] = useState(true);
   const [meshVersion, setMeshVersion] = useState(Date.now());
   // New state for left panel
-  const [shortRoots, setShortRoots] = useState(false);
-  const [showLandmarks, setShowLandmarks] = useState(true);
+  const [shortRoots, setShortRoots] = useState(true);
+  const [showLandmarks, setShowLandmarks] = useState(false);
 
   // Initial data fetch  
   useEffect(() => {
@@ -78,6 +79,11 @@ export default function Ortho(props) {
       console.error('Failed to reload orthoData:', err);
     }
   }, [props.onFileLoaded]);
+
+  // Handle T2Stage updates
+  useEffect(() => {
+    setT2Stage(orthoData.Staging && orthoData.Staging.length > 0 ? orthoData.T2Stage -1 : 0)
+  }, [orthoData, setT2Stage]);
 
   // задание начальной позиции камеры
   useEffect(() => {
@@ -173,6 +179,10 @@ export default function Ortho(props) {
         onLandmarksToggle={handleLandmarksToggle}
         showLandmarks={showLandmarks}
         onPredictT2={handlePredictT2}
+        stage={stage}
+        maxStage={T2Stage}
+        onStageChange={setStage}
+        onFileLoaded={handleFileLoaded}
       >
         <Canvas
           camera={{ fov: 10, position: [0, 0, 20] }}
