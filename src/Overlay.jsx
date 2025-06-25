@@ -52,6 +52,14 @@ function MenuBar({ onFileLoaded }) {
       const file = e.target.files[0];
       if (!file) return;
       try {
+        // 1. Upload the file to backend
+        const formData = new FormData();
+        formData.append('file', file);
+        await fetch('http://localhost:8000/oas-files/upload', {
+          method: 'POST',
+          body: formData
+        });
+        // 2. Call exportTeeth with the filename
         const { exportTeeth } = await import('./api/exportTeeth');
         await exportTeeth(file.name);
         if (onFileLoaded) onFileLoaded(file.name);
@@ -220,16 +228,29 @@ function RightPanel({ onViewSelect }) {
 }
 
 export default function Overlay({ children, stage, maxStage, onStageChange, onViewSelect, onShortRootsToggle, shortRoots, onLandmarksToggle, showLandmarks, onPredictT2, onFileLoaded }) {
-  const [status, setStatus] = React.useState('');
-  const [openedFile, setOpenedFile] = React.useState('');
+  // Persist openedFile in localStorage so it survives reloads
+  const [status, setStatus] = React.useState(() => localStorage.getItem('status') || '');
+  const [openedFile, setOpenedFile] = React.useState(() => localStorage.getItem('openedFile') || '');
+  const [loading, setLoading] = React.useState(false);
 
   // Provide a callback for MenuBar to update status and file name
   const handleFileLoaded = async (filename) => {
     setStatus('Loading...');
     setOpenedFile(filename);
+    setLoading(true);
+    localStorage.setItem('status', 'Loading...');
+    localStorage.setItem('openedFile', filename);
     if (onFileLoaded) await onFileLoaded(filename);
     setStatus('');
+    setLoading(false);
+    localStorage.setItem('status', '');
   };
+
+  React.useEffect(() => {
+    // On mount, restore status and openedFile from localStorage
+    setStatus(localStorage.getItem('status') || '');
+    setOpenedFile(localStorage.getItem('openedFile') || '');
+  }, []);
 
   return (
     <Box sx={{ height: '100vh', width: '100vw', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1, overflow: 'hidden' }}>
@@ -274,7 +295,7 @@ export default function Overlay({ children, stage, maxStage, onStageChange, onVi
       {/* Status bar */}
       <Box sx={{ position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 3, height: 32, bgcolor: 'rgba(240,240,240,0.95)', borderTop: '1px solid #ccc', display: 'flex', alignItems: 'center', px: 2, fontSize: 15, color: '#333', pointerEvents: 'auto' }}>
         <span style={{ fontWeight: 500, marginRight: 16 }}>File: {openedFile || 'None'}</span>
-        <span>Status: {status || 'Ready'}</span>
+        <span>Status: {loading || status === 'Loading...' ? 'Loading...' : (status || 'Ready')}</span>
       </Box>
     </Box>
   )

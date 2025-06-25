@@ -70,7 +70,7 @@ export default function Ortho(props) {
       console.log('Updating mesh version to:', timestamp);
       setMeshVersion(timestamp);
       setOrthoData(data);
-      console.log('Ortho data reloaded:', data);
+      // console.log('Ortho data reloaded:', data);
       // Call parent's onFileLoaded callback if provided
       if (props.onFileLoaded) {
         await props.onFileLoaded(filename);
