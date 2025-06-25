@@ -228,26 +228,38 @@ function RightPanel({ onViewSelect }) {
 }
 
 export default function Overlay({ children, stage, maxStage, onStageChange, onViewSelect, onShortRootsToggle, shortRoots, onLandmarksToggle, showLandmarks, onPredictT2, onFileLoaded }) {
-  // Persist openedFile in localStorage so it survives reloads
   const [status, setStatus] = React.useState(() => localStorage.getItem('status') || '');
   const [openedFile, setOpenedFile] = React.useState(() => localStorage.getItem('openedFile') || '');
   const [loading, setLoading] = React.useState(false);
+  const loadingRef = React.useRef(false);
 
   // Provide a callback for MenuBar to update status and file name
   const handleFileLoaded = async (filename) => {
     setStatus('Loading...');
     setOpenedFile(filename);
     setLoading(true);
+    loadingRef.current = true;
     localStorage.setItem('status', 'Loading...');
     localStorage.setItem('openedFile', filename);
     if (onFileLoaded) await onFileLoaded(filename);
-    setStatus('');
-    setLoading(false);
-    localStorage.setItem('status', '');
+    // Do NOT set status/loading to ''/false here; let parent (Ortho) signal when data is ready
   };
 
+  // Listen for mesh/data reload completion from Ortho
   React.useEffect(() => {
-    // On mount, restore status and openedFile from localStorage
+    // Only clear loading if we are actually loading (not on every children change)
+    if (loading && status === 'Loading...') {
+      // Heuristic: if children change and status is still 'Loading...', clear after a tick
+      setTimeout(() => {
+        setStatus('');
+        setLoading(false);
+        localStorage.setItem('status', '');
+      }, 100);
+    }
+    // eslint-disable-next-line
+  }, [children, loading, status]);
+
+  React.useEffect(() => {
     setStatus(localStorage.getItem('status') || '');
     setOpenedFile(localStorage.getItem('openedFile') || '');
   }, []);
