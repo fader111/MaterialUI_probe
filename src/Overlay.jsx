@@ -14,6 +14,9 @@ import SaveAltIcon from '@mui/icons-material/SaveAlt'
 import PublishIcon from '@mui/icons-material/Publish'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import Slider from '@mui/material/Slider'
+import IconButton from '@mui/material/IconButton'
+import ArrowLeftIcon from '@mui/icons-material/ArrowLeft'
+import ArrowRightIcon from '@mui/icons-material/ArrowRight'
 
 function MenuBar({ onFileLoaded }) {
   const [anchorEls, setAnchorEls] = React.useState({})
@@ -291,17 +294,25 @@ export default function Overlay({ children, stage, maxStage, onStageChange, onVi
         </Box>
       </Box>
       {/* Bottom slider */}
-      <Box sx={{ position: 'absolute', left: 0, right: 0, bottom: 48, zIndex: 2, pointerEvents: 'none', display: 'flex', justifyContent: 'center' }}>
-        <Box sx={{ width: 300, pointerEvents: 'auto', borderRadius: 2, px: 2, py: 1 }}>
-          <Slider
-            value={typeof stage === 'number' ? stage : 0}
-            min={0}
-            max={typeof maxStage === 'number' && maxStage > 0 ? maxStage : 1}
-            step={1}
-            onChange={(_, v) => onStageChange && onStageChange(v)}
-            valueLabelDisplay="auto"
-            aria-label="Stage Slider"
-          />
+      <Box sx={{ position: 'absolute', left: 0, right: 0, bottom: 48, zIndex: 2, pointerEvents: 'none', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, pointerEvents: 'auto' }}>
+          <IconButton size="small" onClick={() => onStageChange && onStageChange(0)} disabled={stage === 0}>
+            <ArrowLeftIcon sx={{ fontSize: 40, color: 'rgba(13, 97, 175, 0.99)' }} />
+          </IconButton>
+          <Box sx={{ width: 300, borderRadius: 2, px: 2, py: 1 }}>
+            <Slider
+              value={typeof stage === 'number' ? stage : 0}
+              min={0}
+              max={typeof maxStage === 'number' && maxStage > 0 ? maxStage : 1}
+              step={1}
+              onChange={(_, v) => onStageChange && onStageChange(v)}
+              valueLabelDisplay="auto"
+              aria-label="Stage Slider"
+            />
+          </Box>
+          <IconButton size="small" onClick={() => onStageChange && onStageChange(maxStage)} disabled={stage === maxStage}>
+            <ArrowRightIcon sx={{ fontSize: 40, color: 'rgba(13, 97, 175, 0.99)' }}  />
+          </IconButton>
         </Box>
       </Box>
       {/* Status bar */}
