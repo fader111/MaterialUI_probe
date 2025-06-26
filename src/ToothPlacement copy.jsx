@@ -10,7 +10,7 @@ export const ToothPlacement = forwardRef((props, ref) => {
         setControlsEnabled, 
         orthoData,
         stage,
-        // onStagingDataUpdate, // Not in the Ortho!! remove?? 
+        onStagingDataUpdate, // Not in the Ortho!! remove?? 
         stagingPatterns, 
         stagingPatternsTrigger, 
         stagingType = "Case", 
@@ -160,10 +160,7 @@ export const ToothPlacement = forwardRef((props, ref) => {
     }), [jsonStageVec3, linearStagingData, MAPSStagingData, stage]);
 
     let stagingData = stagingDataSelector[stagingType] || {};
-    let predictedStagingData;
 
-    // console.log("164\n", "stagingData", stagingData, "predictedStagingData", predictedStagingData); 
-    
     const handleToothTransform = useCallback((toothId, transforms) => {
         if (jsonStagingData && jsonStagingData[stage]) {
             const jawTranslation = toothId > 30 ? mandibulaRt.translation : maxillaRt.translation;
@@ -203,10 +200,9 @@ export const ToothPlacement = forwardRef((props, ref) => {
                 }
             };
             console.log("updatedStagingData", stage, updatedStagingData[stage])
-            // onStagingDataUpdate(updatedStagingData);
+            onStagingDataUpdate(updatedStagingData);
         }
-    // }, [jsonStagingData, stage, onStagingDataUpdate, mandibulaRt, maxillaRt]);
-    }, [jsonStagingData, stage, mandibulaRt, maxillaRt]);
+    }, [jsonStagingData, stage, onStagingDataUpdate, mandibulaRt, maxillaRt]);
 
     // Handler to call AI prediction endpoint (moved from Overlay)
     const handlePredictT2 = async (setLoadingPrediction, setPredictionError) => {
@@ -229,25 +225,19 @@ export const ToothPlacement = forwardRef((props, ref) => {
             const data = await response.json();
             console.log('Prediction data received:', data);
             if (jsonStagingData && jsonStagingData.length > 0) {
-                predictedStagingData = [...jsonStagingData];
-                const t2StageIdx = predictedStagingData.length - 1;
-                const t2Stage = { ...predictedStagingData[t2StageIdx] };
-                console.log('predictedStagingData[t2StageIdx]', predictedStagingData[t2StageIdx]); 
-                console.log('t2Stage before update:', t2Stage);
+                const updatedStagingData = [...jsonStagingData];
+                const t2StageIdx = updatedStagingData.length - 1;
+                const t2Stage = { ...updatedStagingData[t2StageIdx] };
                 const toothIDs = Object.keys(t2Stage.RelativeToothTransforms);
                 const newTransforms = {};
                 toothIDs.forEach((toothID, idx) => {
                     newTransforms[toothID] = data.prediction[idx];
                 });
                 t2Stage.RelativeToothTransforms = newTransforms;
-                predictedStagingData[t2StageIdx] = t2Stage;
-                console.log('data.prediction', data.prediction)
-                console.log('Updated T2 staging data:', predictedStagingData[t2StageIdx]);
-                // console.log('Updated staging data after prediction:', predictedStagingData);
-                // if (onStagingDataUpdate) onStagingDataUpdate(predictedStagingData);
-                console.log('jsonStagingData92 before', jsonStagingData[92].RelativeToothTransforms[11]);
-                stagingData = predictedStagingData;
-                console.log('stagingData92 after', stagingData[92].RelativeToothTransforms[11]);
+                updatedStagingData[t2StageIdx] = t2Stage;
+                console.log('Updated staging data after prediction:', updatedStagingData);
+                if (onStagingDataUpdate) onStagingDataUpdate(updatedStagingData);
+                // stagingData = updatedStagingData; // Update local copy
             }
         } catch (err) {
             console.error('Error in handlePredictT2:', err);
@@ -264,8 +254,25 @@ export const ToothPlacement = forwardRef((props, ref) => {
     React.useEffect(() => { setShowMode(showModeProp); }, [showModeProp]);
 
     // Only R3F objects inside group
+    // Use updated stagingData from props if available
+    const [localStagingData, setLocalStagingData] = useState(jsonStagingData);
+    // Sync local staging data with parent updates
+    useEffect(() => {
+        setLocalStagingData(jsonStagingData);
+    }, [jsonStagingData]);
+
+    // Helper to get current stage's data from localStagingData
+    const getcurrentStagingData = () => {
+        if (!localStagingData || localStagingData.length === 0) return {};
+        const currentStage = localStagingData[stage] || {};
+        console.log("getcurrentStagingData", currentStage);
+        return currentStage.RelativeToothTransforms || {};
+    };
+    const currentStagingData = getcurrentStagingData();
+
     return (
         <group onClick={handleCanvasClick}>
+            {/* {Object.keys(currentStagingData).map((toothID) => ( */}
             {Object.keys(stagingData).map((toothID) => (
                 (showMode === 0 && toothID < 30) ||
                 (showMode === 1 && toothID > 30) ||
@@ -281,7 +288,7 @@ export const ToothPlacement = forwardRef((props, ref) => {
                         trackballControlsRef={trackballControlsRef}
                         setControlsEnabled={setControlsEnabled}
                         stage={stage}
-                        stagingData={stagingData[toothID]}
+                        stagingData={currentStagingData[toothID]}
                         landmarks={landmarksT1 ? landmarksT1[toothID] : {}}
                         url={`/meshes/${toothID}.stl?ts=${props.meshVersion}`}
                         meshVersion={props.meshVersion}
