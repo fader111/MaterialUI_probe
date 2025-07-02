@@ -218,7 +218,8 @@ export const ToothPlacement = forwardRef((props, ref) => {
         try {
             // console.log('baseCaseFilename', baseCaseFilename);
             const base_case_id = baseCaseFilename || '00000000';
-            const template_case_id = '00000000';
+            // const template_case_id = '00000000';
+            const template_case_id = '120737';
             console.log('Sending fetch to /predict-t2/', base_case_id, template_case_id);
             const response = await fetch('http://localhost:8000/predict-t2/', {
                 method: 'POST',

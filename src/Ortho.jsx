@@ -197,6 +197,7 @@ export default function Ortho(props) {
         maxStage={T2Stage}
         onStageChange={setStage}
         onFileLoaded={handleFileLoaded}
+        baseCaseFilename={baseCaseFilename}
       >
         <Canvas
           camera={{ fov: 10, position: [0, 0, 20] }}

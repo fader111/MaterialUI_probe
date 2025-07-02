@@ -230,9 +230,8 @@ function RightPanel({ onViewSelect }) {
   )
 }
 
-export default function Overlay({ children, stage, maxStage, onStageChange, onViewSelect, onShortRootsToggle, shortRoots, onLandmarksToggle, showLandmarks, onPredictT2, onFileLoaded }) {
+export default function Overlay({ children, stage, maxStage, onStageChange, onViewSelect, onShortRootsToggle, shortRoots, onLandmarksToggle, showLandmarks, onPredictT2, onFileLoaded, baseCaseFilename }) {
   const [status, setStatus] = React.useState(() => localStorage.getItem('status') || '');
-  const [openedFile, setOpenedFile] = React.useState(() => localStorage.getItem('openedFile') || '');
   const [loading, setLoading] = React.useState(false);
   const loadingRef = React.useRef(false);
 
@@ -252,7 +251,6 @@ export default function Overlay({ children, stage, maxStage, onStageChange, onVi
 
   React.useEffect(() => {
     setStatus(localStorage.getItem('status') || '');
-    setOpenedFile(localStorage.getItem('openedFile') || '');
   }, []);
 
   return (
@@ -305,7 +303,7 @@ export default function Overlay({ children, stage, maxStage, onStageChange, onVi
       </Box>
       {/* Status bar */}
       <Box sx={{ position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 3, height: 32, bgcolor: 'rgba(240,240,240,0.95)', borderTop: '1px solid #ccc', display: 'flex', alignItems: 'center', px: 2, fontSize: 15, color: '#333', pointerEvents: 'auto' }}>
-        <span style={{ fontWeight: 500, marginRight: 16 }}>File: {openedFile || 'None'}</span>
+        <span style={{ fontWeight: 500, marginRight: 16 }}>File: {baseCaseFilename+".oas" || 'None'}</span>
         <span>Status: {loading || status === 'Loading...' ? 'Loading...' : (status || 'Ready')}</span>
       </Box>
     </Box>
