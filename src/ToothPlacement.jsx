@@ -95,13 +95,13 @@ export const ToothPlacement = forwardRef((props, ref) => {
                 t1Vec3[toothID] = {
                     // position: toothRtT1.translation.add(occlusalTransform.translation),
                     // position: toothRtT1.translation,//.add(jawTranstation),
-                    position: toothRtT1.translation,//.sub(occlusalTransform.translation),
+                    position: toothRtT1.translation.add(jawTranstation),//.sub(occlusalTransform.translation),
                     // quaternion: toothRtT1.quaternion.multiply(occlusalTransform.quaternion)
                     quaternion: toothRtT1.quaternion//.multiply(jawRotation)
                 };
                 t2Vec3[toothID] = {
                     // position: toothRtT2.translation,//.add(jawTranstation),
-                    position: toothRtT2.translation,//.sub(occlusalTransform.translation),
+                    position: toothRtT2.translation.add(jawTranstation),//.sub(occlusalTransform.translation),
                     // position: toothRtT2.translation.add(occlusalTransform.translation),
                     quaternion: toothRtT2.quaternion//.multiply(jawRotation)
                     // quaternion: toothRtT2.quaternion.multiply(occlusalTransform.quaternion)
@@ -160,10 +160,11 @@ export const ToothPlacement = forwardRef((props, ref) => {
     }), [jsonStageVec3, linearStagingData, MAPSStagingData, stage]);
 
     let stagingData = stagingDataSelector[stagingType] || {};
-    let predictedStagingData;
+    let predictedT2;
 
-    // console.log("164\n", "stagingData", stagingData, "predictedStagingData", predictedStagingData); 
-    
+    // Add state to trigger rerender with new T2 prediction
+    const [rerenderStageData, setRerenderStagingData] = useState(null);
+
     const handleToothTransform = useCallback((toothId, transforms) => {
         if (jsonStagingData && jsonStagingData[stage]) {
             const jawTranslation = toothId > 30 ? mandibulaRt.translation : maxillaRt.translation;
@@ -226,29 +227,24 @@ export const ToothPlacement = forwardRef((props, ref) => {
             if (!response.ok) {
                 throw new Error('Prediction failed');
             }
-            const data = await response.json();
-            console.log('Prediction data received:', data);
-            if (jsonStagingData && jsonStagingData.length > 0) {
-                predictedStagingData = [...jsonStagingData];
-                const t2StageIdx = predictedStagingData.length - 1;
-                const t2Stage = { ...predictedStagingData[t2StageIdx] };
-                console.log('predictedStagingData[t2StageIdx]', predictedStagingData[t2StageIdx]); 
-                console.log('t2Stage before update:', t2Stage);
-                const toothIDs = Object.keys(t2Stage.RelativeToothTransforms);
-                const newTransforms = {};
-                toothIDs.forEach((toothID, idx) => {
-                    newTransforms[toothID] = data.prediction[idx];
-                });
-                t2Stage.RelativeToothTransforms = newTransforms;
-                predictedStagingData[t2StageIdx] = t2Stage;
-                console.log('data.prediction', data.prediction)
-                console.log('Updated T2 staging data:', predictedStagingData[t2StageIdx]);
-                // console.log('Updated staging data after prediction:', predictedStagingData);
-                // if (onStagingDataUpdate) onStagingDataUpdate(predictedStagingData);
-                console.log('jsonStagingData92 before', jsonStagingData[92].RelativeToothTransforms[11]);
-                stagingData = predictedStagingData;
-                console.log('stagingData92 after', stagingData[92].RelativeToothTransforms[11]);
-            }
+            const prediction = await response.json();
+            const toothIDs = Object.keys(prediction);
+            const newTransforms = {};
+
+            toothIDs.forEach(toothID => {
+                // const t1 = jsonT1Vec3[toothID];
+                const pred = rt(prediction[toothID]);
+                const newQuaternion = pred.quaternion.clone();
+                const newPosition = pred.translation.clone();
+                const jawTranstation = toothID > 30 ? mandibulaRt.translation : maxillaRt.translation;
+                newPosition.add(jawTranstation); // Adjust position by jaw translation
+                // jaw rotation?!
+                newTransforms[toothID] = {
+                    position: newPosition,
+                    quaternion: newQuaternion
+                };
+            });
+            setRerenderStagingData(newTransforms); // <-- trigger rerender
         } catch (err) {
             console.error('Error in handlePredictT2:', err);
             setPredictionError(err.message);
@@ -264,9 +260,18 @@ export const ToothPlacement = forwardRef((props, ref) => {
     React.useEffect(() => { setShowMode(showModeProp); }, [showModeProp]);
 
     // Only R3F objects inside group
+    // Use rerenderStageData if present, otherwise use computed stagingData
+    const currentStageData = rerenderStageData && stage == stagesNum -1 ? rerenderStageData : stagingData;
+    // console.log("rerenderStageData", rerenderStageData);
+    // console.log("currentStage Data", stage, currentStageData);
+
+    // Filter only valid tooth IDs
+    const validToothIDs = Object.keys(currentStageData).filter(toothID => /^\d+$/.test(toothID));
+    // console.log("currentStageData", currentStageData);
+
     return (
         <group onClick={handleCanvasClick}>
-            {Object.keys(stagingData).map((toothID) => (
+            {validToothIDs.map((toothID) => (
                 (showMode === 0 && toothID < 30) ||
                 (showMode === 1 && toothID > 30) ||
                 (showMode === 2) ||
@@ -281,7 +286,7 @@ export const ToothPlacement = forwardRef((props, ref) => {
                         trackballControlsRef={trackballControlsRef}
                         setControlsEnabled={setControlsEnabled}
                         stage={stage}
-                        stagingData={stagingData[toothID]}
+                        stagingData={currentStageData[toothID]}
                         landmarks={landmarksT1 ? landmarksT1[toothID] : {}}
                         url={`/meshes/${toothID}.stl?ts=${props.meshVersion}`}
                         meshVersion={props.meshVersion}

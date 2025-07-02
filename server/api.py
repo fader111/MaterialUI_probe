@@ -7,7 +7,7 @@ import shutil
 import glob
 from subprocess import run, PIPE
 import sys
-from server.inference.model_inference import get_pediction, get_transforms
+from server.inference.model_inference import get_pediction, get_predicted_transforms
 from fastapi import Body
 
 app = FastAPI()
@@ -89,10 +89,15 @@ def predict_t2(
     base_case_id: str = Body(...),
     template_case_id: str = Body(...)
 ):
-    pred, loss = get_transforms(
+    # pred, loss = get_transforms(
+    pred = get_predicted_transforms(
         base_case_id=base_case_id,
         template_case_id=template_case_id
     )
     # Convert pred (numpy or torch tensor) to list for JSON serialization
-    return {"prediction": pred, "loss": loss}
+    # print(f"DEBUG: base_case_id={base_case_id}, template_case_id={template_case_id}")
+    # print(f"DEBUG: pred={pred}, loss={loss}")
+    # print(f"DEBUG: pred={pred}, loss={loss}")
+    # return {"prediction": pred, "loss": loss}
+    return pred
 
