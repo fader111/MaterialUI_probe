@@ -41,6 +41,16 @@ export default function Ortho(props) {
   // New state for left panel
   const [shortRoots, setShortRoots] = useState(true);
   const [showLandmarks, setShowLandmarks] = useState(false);
+  // Track the loaded filename for ToothPlacement
+  const [baseCaseFilename, setBaseCaseFilename] = useState(() => {
+    // Initialize from localStorage if available
+    try {
+      const stored = localStorage.getItem('baseCaseFilename');
+      return stored ? stored : null;
+    } catch (e) {
+      return null;
+    }
+  });
 
   // Initial data fetch  
   useEffect(() => {
@@ -67,11 +77,15 @@ export default function Ortho(props) {
       const response = await fetch(`/orthoData.json?_=${timestamp}`); // cache-busting
       if (!response.ok) throw new Error('Failed to reload orthoData');
       const data = await response.json();
-      console.log('Updating mesh version to:', timestamp);
       setMeshVersion(timestamp);
       setOrthoData(data);
-      // console.log('Ortho data reloaded:', data);
-      // Call parent's onFileLoaded callback if provided
+      const cleanFilename = filename.replace(/\.oas$/i, '');
+      setBaseCaseFilename(cleanFilename);
+      try {
+        localStorage.setItem('baseCaseFilename', cleanFilename);
+      } catch (e) {
+        // Ignore localStorage errors
+      }
       if (props.onFileLoaded) {
         await props.onFileLoaded(filename);
       }
@@ -204,6 +218,7 @@ export default function Ortho(props) {
             meshVersion={meshVersion}
             useShortRoots={shortRoots}
             showLandmarks={showLandmarks}
+            baseCaseFilename={baseCaseFilename}
           />
           <TrackballControls
             ref={controlsRef}

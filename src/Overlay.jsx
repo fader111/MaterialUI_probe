@@ -236,18 +236,6 @@ export default function Overlay({ children, stage, maxStage, onStageChange, onVi
   const [loading, setLoading] = React.useState(false);
   const loadingRef = React.useRef(false);
 
-  // Provide a callback for MenuBar to update status and file name
-  const handleFileLoaded = async (filename) => {
-    setStatus('Loading...');
-    setOpenedFile(filename);
-    setLoading(true);
-    loadingRef.current = true;
-    localStorage.setItem('status', 'Loading...');
-    localStorage.setItem('openedFile', filename);
-    if (onFileLoaded) await onFileLoaded(filename);
-    // Do NOT set status/loading to ''/false here; let parent (Ortho) signal when data is ready
-  };
-
   // Listen for mesh/data reload completion from Ortho
   React.useEffect(() => {
     // Only clear loading if we are actually loading (not on every children change)
@@ -275,7 +263,7 @@ export default function Overlay({ children, stage, maxStage, onStageChange, onVi
       </Box>
       {/* Overlay UI panels */}
       <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 2, pointerEvents: 'auto' }}>
-        <MenuBar onFileLoaded={handleFileLoaded} />
+        <MenuBar onFileLoaded={onFileLoaded} />
       </Box>
       <Box sx={{ position: 'absolute', top: '50%', left: 20, transform: 'translateY(-60%)', zIndex: 2, display: 'flex', flexDirection: 'column', pointerEvents: 'none' }}>
         <Box sx={{ pointerEvents: 'auto' }}>

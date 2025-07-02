@@ -11,6 +11,7 @@ from autosetup_ml.utils import *
 import torch
 import torch.nn as nn
 import json
+import time
 
 class InitAutoencoder(nn.Module):
     def __init__(self, num_teeth: int = 28, num_points: int = 5, coord_dim: int = 3):
@@ -176,15 +177,23 @@ def regressor_eval_fn(ae_pred,
     return predictions, loss.item()
 
 def getToothRelativeTransform(tooth, stage):
-    translation = tooth.relativeTransform(stage).translation
-    rotation = tooth.relativeTransform(stage).rotation
-    return {
-        "translation": {
-            "x": translation.x, "y": translation.y, "z": translation.z},
-        "rotation": {
-            "x": rotation.im.x, "y": rotation.im.y, "z": rotation.im.z,
-            "w": rotation.re}
-    }
+    try:
+        rel_transform = tooth.relativeTransform(stage)
+        if rel_transform is None:
+            print(f"[ERROR] Null pointer: relativeTransform({stage}) is None for tooth {getattr(tooth, 'cl_id', 'unknown')}")
+            return None
+        translation = rel_transform.translation
+        rotation = rel_transform.rotation
+        return {
+            "translation": {
+                "x": translation.x, "y": translation.y, "z": translation.z},
+            "rotation": {
+                "x": rotation.im.x, "y": rotation.im.y, "z": rotation.im.z,
+                "w": rotation.re}
+        }
+    except Exception as e:
+        print(f"[ERROR] Exception in getToothRelativeTransform for tooth {getattr(tooth, 'cl_id', 'unknown')}: {e}")
+        return None
 
 def get_pediction( 
                     base_case_points_t1: NDArray,
@@ -194,24 +203,6 @@ def get_pediction(
                     init_ae_checkpoint_path: str = "server/inference/init_ae/best_model.pth",
                     regressor_checkpoint_path: str = "server/inference/arch_regressor/best_model.pth"
 )-> Tuple[NDArray, NDArray, float]:  
-    
-    # # Get base case points
-    # base_oas_file_path = os.path.join(oas_folder, f"{base_case_id}.oas")
-    # base_orthoCase = OrthoCase(base_oas_file_path)
-    # base_case_points_t1, base_case_points_t2 = case_landmark_grids(base_orthoCase)     
-
-    # # Get template case points
-    # template_oas_file_path = os.path.join(oas_folder, f"{template_case_id}.oas")
-    # template_orthoCase = OrthoCase(template_oas_file_path)
-    # template_points_t1, template_points_t2 = case_landmark_grids(template_orthoCase)     
-    
-    # # Get base case arch form for reference
-    # prefs_base = get_prescription_preferences_tables_content(base_oas_file_path)
-    # base_archform_str = prefs_base.get("clinicalPreferences", {}).get("finalToothPosition", {}).get("archForm")
-    
-    # # Get template arch form
-    # prefs_templ = get_prescription_preferences_tables_content(template_oas_file_path)
-    # template_archform_str = prefs_templ.get("clinicalPreferences", {}).get("finalToothPosition", {}).get("archForm")
     
     # Init AE prediction
     init_predictions, _ = init_ae_eval_fn(base_case_points_t1, base_case_points_t2, checkpoint_path=init_ae_checkpoint_path)
@@ -230,31 +221,35 @@ def get_pediction(
     return regress_predictions, base_case_points_t1, regress_loss
     # return base_case_points_t2, base_case_points_t1, regress_loss # DEBUG!!!!!!!!!!!!!!!
 
-def get_predicted_transforms(oas_folder="server",
+def get_predicted_transforms(
         base_case_id = "00000000",
         template_case_id = "00000000",
         # base_oas_file_path = "server/00000000.oas",
+        oas_folder="server",
         init_ae_checkpoint_path = "server/inference/init_ae/best_model.pth",
         regressor_checkpoint_path = "server/inference/arch_regressor/best_model.pth"
     ) -> Tuple[List[Dict[str, Any]]]:
-    
+    # base_case_id = "00000000"
+    print(f"!!! inference  base case id {base_case_id}, template case id {template_case_id}")
     # Get base case points
     base_oas_file_path = os.path.join(oas_folder, f"{base_case_id}.oas")
     base_orthoCase = OrthoCase(base_oas_file_path)
     base_case_points_t1, base_case_points_t2 = case_landmark_grids(base_orthoCase)     
-
+    # add blocking to wait 2 seconds here
+    time.sleep(2)
     # Get template case points
     template_oas_file_path = os.path.join(oas_folder, f"{template_case_id}.oas")
     template_orthoCase = OrthoCase(template_oas_file_path)
+    print(f"!!! inference2  {template_orthoCase}")
     template_points_t1, template_points_t2 = case_landmark_grids(template_orthoCase)     
     
     # Get base case arch form for reference
-    prefs_base = get_prescription_preferences_tables_content(base_oas_file_path)
-    base_archform_str = prefs_base.get("clinicalPreferences", {}).get("finalToothPosition", {}).get("archForm")
+    # prefs_base = get_prescription_preferences_tables_content(base_oas_file_path)
+    # base_archform_str = prefs_base.get("clinicalPreferences", {}).get("finalToothPosition", {}).get("archForm")
     
     # Get template arch form
-    prefs_templ = get_prescription_preferences_tables_content(template_oas_file_path)
-    template_archform_str = prefs_templ.get("clinicalPreferences", {}).get("finalToothPosition", {}).get("archForm")
+    # prefs_templ = get_prescription_preferences_tables_content(template_oas_file_path)
+    # template_archform_str = prefs_templ.get("clinicalPreferences", {}).get("finalToothPosition", {}).get("archForm")
     
 
     predictions, base_case_points_t1, loss = get_pediction(
@@ -273,10 +268,13 @@ def get_predicted_transforms(oas_folder="server",
 
         # Get T1 transform matrix
         tooth = base_orthoCase.get_tooth_by_cl_id(tooth_id)
-        if tooth is None:
-            print(f"Tooth with ID {tooth_id} not found in base case.")
-            continue
+        # if tooth is None:
+        #     print(f"Tooth with ID {tooth_id} not found in base case.")
+        #     continue
         toothRT0 = getToothRelativeTransform(tooth, 0)
+        if toothRT0 is None: # if tooth not present, 
+            print(f"[ERROR] Skipping tooth {tooth_id} not presented.")
+            continue
         t1_matrix = get_transform_matrix(toothRT0)
         # Get predicted transform (from T1 to predicted)
         pred_matrix = calc_transform_matrix_fr_points(tooth_points_t1, tooth_points_pred)

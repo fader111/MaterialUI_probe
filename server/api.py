@@ -90,6 +90,7 @@ def predict_t2(
     template_case_id: str = Body(...)
 ):
     # pred, loss = get_transforms(
+    print(f"API!!!!!!!!! base_case_id={base_case_id}, template_case_id={template_case_id}")
     pred = get_predicted_transforms(
         base_case_id=base_case_id,
         template_case_id=template_case_id
