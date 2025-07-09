@@ -35,14 +35,6 @@ export const ToothPlacement = forwardRef((props, ref) => {
         }
     }, []);
 
-    // const [_stagingPatterns, setStagingPatterns] = useState(stagingPatterns);
-    // const updateStagingPatterns = (newPatterns) => {
-    //     setStagingPatterns({ ...newPatterns });
-    //   };
-    // updateStagingPatterns({..._stagingPatterns});
-
-    // console.log("call toothplacement - stagingPatterns:", stagingPatterns)
-    // Set default values when jsonStagingData is null or empty
     const jsonMandibularData = orthoData?.mandibularRelativeTransform || null;
     const jsonMaxillaData = orthoData?.maxillaRelativeTransform || null;
     const jsonStagingData = orthoData?.Staging || null;
@@ -218,8 +210,18 @@ export const ToothPlacement = forwardRef((props, ref) => {
         try {
             // console.log('baseCaseFilename', baseCaseFilename);
             const base_case_id = baseCaseFilename || '00000000';
+            
+            // Set template case ID - Need to be set from parent NOW hardcoded for testing
             // const template_case_id = '00000000';
-            const template_case_id = '120737';
+            // const template_case_id = '103931_8.3';
+            const template_case_id = '103931_8.4';
+            // const template_case_id = '120076'; // Peydro Case
+            // const template_case_id = 'Paula_Martinez_Otalo_907080_P'; // Peydro Case
+            // const template_case_id = '912559';
+            
+            // const template_case_id = "1623883_1.4"
+            // const template_case_id = baseCaseFilename
+            
             console.log('Sending fetch to /predict-t2/', base_case_id, template_case_id);
             const response = await fetch('http://localhost:8000/predict-t2/', {
                 method: 'POST',

@@ -253,6 +253,11 @@ export default function Overlay({ children, stage, maxStage, onStageChange, onVi
     setStatus(localStorage.getItem('status') || '');
   }, []);
 
+  // Pattern selection state
+  const [archType, setArchType] = React.useState('Damon'); // Damon, Parabolic, Natural
+  const [expand, setExpand] = React.useState(false);
+  const [moveType, setMoveType] = React.useState(''); // Distalize, Mezialize, ''
+
   return (
     <Box sx={{ height: '100vh', width: '100vw', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1, overflow: 'hidden' }}>
       {/* Main content (scene) in the background */}
@@ -272,6 +277,95 @@ export default function Overlay({ children, stage, maxStage, onStageChange, onVi
             showLandmarks={showLandmarks}
             onPredictT2={onPredictT2}
           />
+        </Box>
+        {/* Pattern selection panel */}
+        <Box sx={{ pointerEvents: 'auto', mt: 2, bgcolor: 'rgba(245,245,245,0.5)', borderRadius: 2, p: 1, display: 'flex', flexDirection: 'column', gap: 1, alignItems: 'center' }}>
+          {/* Arch type (only one selectable) */}
+          <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 1 }}>
+            {['Damon', 'Parabolic', 'Natural'].map(pattern => (
+              <Button
+                key={pattern}
+                variant={archType === pattern ? 'contained' : 'text'}
+                size="small"
+                sx={{
+                  minWidth: 0,
+                  p: 1,
+                  borderRadius: 2,
+                  background: archType === pattern ? '#0e83f1' : 'none',
+                  color: archType === pattern ? 'white' : '#0e83f1',
+                  fontWeight: 400,
+                  fontSize: 12,
+                  width: '100%',
+                  height: 36,
+                  boxShadow: 'none',
+                  border: 'none',
+                  outline: 'none',
+                  '&:focus': { border: 'none', outline: 'none' },
+                  '&:active': { border: 'none', outline: 'none' },
+                  '&:hover': { background: archType === pattern ? '#1565c0' : 'rgba(14,131,241,0.08)' },
+                }}
+                onClick={() => setArchType(pattern)}
+              >
+                {pattern}
+              </Button>
+            ))}
+          </Box>
+          {/* Expand (toggle) */}
+          <Button
+            variant={expand ? 'contained' : 'text'}
+            size="small"
+            sx={{
+              minWidth: 0,
+              p: 1,
+              borderRadius: 2,
+              background: expand ? '#0e83f1' : 'none',
+              color: expand ? 'white' : '#0e83f1',
+              fontWeight: 400,
+              fontSize: 12,
+              width: '100%',
+              height: 36,
+              mt: 1,
+              boxShadow: 'none',
+              border: 'none',
+              outline: 'none',
+              '&:focus': { border: 'none', outline: 'none' },
+              '&:active': { border: 'none', outline: 'none' },
+              '&:hover': { background: expand ? '#1565c0' : 'rgba(14,131,241,0.08)' },
+            }}
+            onClick={() => setExpand(v => !v)}
+          >
+            Expand
+          </Button>
+          {/* Move type (only one selectable) */}
+          <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 1, mt: 1 }}>
+            {['Distalize', 'Mezialize'].map(pattern => (
+              <Button
+                key={pattern}
+                variant={moveType === pattern ? 'contained' : 'text'}
+                size="small"
+                sx={{
+                  minWidth: 0,
+                  p: 1,
+                  borderRadius: 2,
+                  background: moveType === pattern ? '#0e83f1' : 'none',
+                  color: moveType === pattern ? 'white' : '#0e83f1',
+                  fontWeight: 400,
+                  fontSize: 12,
+                  width: '100%',
+                  height: 36,
+                  boxShadow: 'none',
+                  border: 'none',
+                  outline: 'none',
+                  '&:focus': { border: 'none', outline: 'none' },
+                  '&:active': { border: 'none', outline: 'none' },
+                  '&:hover': { background: moveType === pattern ? '#1565c0' : 'rgba(14,131,241,0.08)' },
+                }}
+                onClick={() => setMoveType(moveType === pattern ? '' : pattern)}
+              >
+                {pattern}
+              </Button>
+            ))}
+          </Box>
         </Box>
       </Box>
       <Box sx={{ position: 'absolute', top: '50%', right: 20, transform: 'translateY(-50%)', zIndex: 2, display: 'flex', flexDirection: 'column', pointerEvents: 'none' }}>

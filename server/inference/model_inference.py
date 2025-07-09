@@ -11,8 +11,27 @@ from autosetup_ml.utils import *
 import torch
 import torch.nn as nn
 import json
+import contextlib
 import time
 
+@contextlib.contextmanager
+def suppress_stdout_stderr():
+    with open(os.devnull, 'w') as devnull:
+        # Save original file descriptors
+        old_stdout_fd = os.dup(1)
+        old_stderr_fd = os.dup(2)
+        # Redirect stdout/stderr to devnull
+        os.dup2(devnull.fileno(), 1)
+        os.dup2(devnull.fileno(), 2)
+        try:
+            yield
+        finally:
+            # Restore original file descriptors
+            os.dup2(old_stdout_fd, 1)
+            os.dup2(old_stderr_fd, 2)
+            os.close(old_stdout_fd)
+            os.close(old_stderr_fd)
+        
 class InitAutoencoder(nn.Module):
     def __init__(self, num_teeth: int = 28, num_points: int = 5, coord_dim: int = 3):
         super().__init__()
@@ -89,19 +108,6 @@ class ArchFormRegressor(nn.Module):
         x = torch.cat([ae_pred, template], dim=1)
         out = self.net(x)
         return out.view(-1, self.num_teeth, self.num_points, self.coord_dim)
-
-def transforms_to_sorted(teeth_transforms: List[Dict[str, Any]]) -> List[Dict[str, Any]]: # удалять за ненадобностью
-    """
-    Return a list of transforms sorted by tooth ID (ascending).
-    The output is the same structure (list of dicts) as the input.
-    """
-    # Собираем пары (tooth_id, transform)
-    tooth_ids = dw_teeth_nums14 + up_teeth_nums14
-    pairs = list(zip(tooth_ids, teeth_transforms))
-    # Сортируем по tooth_id (на всякий случай, если порядок нарушен)
-    pairs_sorted = sorted(pairs, key=lambda x: x[0])
-    # Возвращаем только список transform в отсортированном порядке
-    return [transform for _, transform in pairs_sorted]
 
 def init_ae_eval_fn(rt_points_t1, 
                     rt_points_t2, 
@@ -210,6 +216,11 @@ def get_pediction(
     
     # Regressor prediction using template from another case
     template_input = template_points_t2 - template_points_t1
+    # Invert x and y coordinates for each point in each tooth
+    template_input = template_input.copy()
+    template_input[..., 0] *= -1  # invert x
+    template_input[..., 1] *= -1  # invert y
+    
     regress_predictions, regress_loss = regressor_eval_fn(init_predictions, 
                                                             template_input, 
                                                             template_points_t2,
@@ -230,17 +241,19 @@ def get_predicted_transforms(
         regressor_checkpoint_path = "server/inference/arch_regressor/best_model.pth"
     ) -> Tuple[List[Dict[str, Any]]]:
     # base_case_id = "00000000"
-    print(f"!!! inference  base case id {base_case_id}, template case id {template_case_id}")
+    # print(f"!!! inference  base case id {base_case_id}, template case id {template_case_id}")
     # Get base case points
     base_oas_file_path = os.path.join(oas_folder, f"{base_case_id}.oas")
-    base_orthoCase = OrthoCase(base_oas_file_path)
+    with suppress_stdout_stderr(): 
+        base_orthoCase = OrthoCase(base_oas_file_path)
     base_case_points_t1, base_case_points_t2 = case_landmark_grids(base_orthoCase)     
     # add blocking to wait 2 seconds here
-    time.sleep(2)
+    # time.sleep(2)
     # Get template case points
     template_oas_file_path = os.path.join(oas_folder, f"{template_case_id}.oas")
-    template_orthoCase = OrthoCase(template_oas_file_path)
-    print(f"!!! inference2  {template_orthoCase}")
+    with suppress_stdout_stderr():
+        template_orthoCase = OrthoCase(template_oas_file_path)
+    # print(f"!!! inference2  {template_orthoCase}")
     template_points_t1, template_points_t2 = case_landmark_grids(template_orthoCase)     
     
     # Get base case arch form for reference
@@ -282,25 +295,99 @@ def get_predicted_transforms(
         # Extract transform
         tooth_transform = get_transform_from_matrix(total_matrix)
         transforms_dict[str(tooth_id)] = tooth_transform
-
+    print(f"T2 inference done ")
     return transforms_dict
     # return {"prediction": transforms_dict, "loss": loss}
 
+class OrthoCaseLoader:
+    def __init__(self, file_path):
+        with suppress_stdout_stderr():
+            self.ortho_case = OrthoCase(file_path)
+    def get_landmarks(self):
+        return case_landmark_grids(self.ortho_case)
+    def get_tooth_by_cl_id(self, tooth_id):
+        return self.ortho_case.get_tooth_by_cl_id(tooth_id)
+
+class AutoencoderInference:
+    def __init__(self, checkpoint_path, num_teeth=28, num_points=5, coord_dim=3):
+        self.model = InitAutoencoder(num_teeth=num_teeth, num_points=num_points, coord_dim=coord_dim).to("cpu")
+        state_dict = torch.load(checkpoint_path, map_location='cpu')
+        self.model.load_state_dict(state_dict)
+        self.model.eval().cpu()
+        self.num_teeth = num_teeth
+        self.num_points = num_points
+        self.coord_dim = coord_dim
+    def predict(self, rt_points_t1, rt_points_t2):
+        x_tensor = torch.from_numpy(rt_points_t1).float().unsqueeze(0)
+        y_tensor = torch.from_numpy(rt_points_t2).float().unsqueeze(0)
+        with torch.no_grad():
+            predictions = self.model(x_tensor)
+            loss = torch.nn.L1Loss()(predictions, y_tensor)
+        return predictions.cpu().detach().numpy(), loss.item()
+
+class ArchRegressorInference:
+    def __init__(self, checkpoint_path, num_teeth=28, num_points=5, coord_dim=3, hidden_dim=512, num_layers=4):
+        self.model = ArchFormRegressor(num_teeth=num_teeth, num_points=num_points, coord_dim=coord_dim, hidden_dim=hidden_dim, num_layers=num_layers).to("cpu")
+        state_dict = torch.load(checkpoint_path, map_location='cpu')
+        self.model.load_state_dict(state_dict)
+        self.model.eval().cpu()
+        self.num_teeth = num_teeth
+        self.num_points = num_points
+        self.coord_dim = coord_dim
+    def predict(self, ae_pred, template, targets):
+        ae_pred_tensor = torch.from_numpy(ae_pred).float().unsqueeze(0)
+        template_tensor = torch.from_numpy(template).float().unsqueeze(0)
+        targets_tensor = torch.from_numpy(targets).float().unsqueeze(0)
+        with torch.no_grad():
+            predictions = self.model(ae_pred_tensor, template_tensor)
+            loss = torch.nn.L1Loss()(predictions, targets_tensor)
+        return predictions.squeeze(0).cpu().detach().numpy(), loss.item()
+
+class OrthoInferencePipeline:
+    def __init__(self, ae_ckpt, reg_ckpt):
+        self.ae = AutoencoderInference(ae_ckpt)
+        self.reg = ArchRegressorInference(reg_ckpt)
+    def run(self, base_case_path, template_case_path):
+        base_loader = OrthoCaseLoader(base_case_path)
+        template_loader = OrthoCaseLoader(template_case_path)
+        base_case_points_t1, base_case_points_t2 = base_loader.get_landmarks()
+        template_points_t1, template_points_t2 = template_loader.get_landmarks()
+        # Prepare template input (invert x and y) wich is strange behaviour!!!! check frontend!!!
+        template_input = template_points_t2 - template_points_t1
+        template_input = template_input.copy()
+        template_input[..., 0] *= -1
+        template_input[..., 1] *= -1
+        # AE prediction
+        init_predictions, _ = self.ae.predict(base_case_points_t1, base_case_points_t2)
+        # Regressor prediction
+        predictions, _ = self.reg.predict(init_predictions, template_input, template_points_t2)
+        # Compose transforms
+        transforms_dict = {}
+        for tooth_idx, tooth_id in enumerate(dw_teeth_nums14 + up_teeth_nums14):
+            tooth_points_t1 = base_case_points_t1[tooth_idx]
+            tooth_points_pred = predictions[tooth_idx]
+            tooth = base_loader.get_tooth_by_cl_id(tooth_id)
+            toothRT0 = getToothRelativeTransform(tooth, 0)
+            if toothRT0 is None:
+                print(f"[ERROR] Skipping tooth {tooth_id} not presented.")
+                continue
+            t1_matrix = get_transform_matrix(toothRT0)
+            pred_matrix = calc_transform_matrix_fr_points(tooth_points_t1, tooth_points_pred)
+            total_matrix = pred_matrix @ t1_matrix
+            tooth_transform = get_transform_from_matrix(total_matrix)
+            transforms_dict[str(tooth_id)] = tooth_transform
+        print(f"T2 inference done (class pipeline)")
+        return transforms_dict
+
 if __name__ == "__main__":
-    # Example usage
-    # teeth_transforms, loss = get_transforms(oas_folder="server",
-    teeth_transforms = get_predicted_transforms(oas_folder="server",
-        base_case_id = "00000000",
-        template_case_id = "00000000",
-        # base_oas_file_path = "server/00000000.oas",
-        init_ae_checkpoint_path = "server/inference/init_ae/best_model.pth",
-        regressor_checkpoint_path = "server/inference/arch_regressor/best_model.pth"
-    )
-    # print(json.dumps(teeth_transforms['11'], indent=2, ensure_ascii=False))
-    print ("Transforms for tooth 37:")
-    print(json.dumps(teeth_transforms['37'], indent=2, ensure_ascii=False))
-    # print("Transforms:", teeth_transforms)cls
-    # print("Predictions shape:", predictions.shape)
-    # print("base_case_points_t1 shape:", base_case_points_t1.shape)
-    # print("Predictions ", predictions)
-    # print("Loss:", loss)
+    # Example usage with new SOLID pipeline
+    base_case_path = os.path.join("server", "00000000.oas")
+    template_case_path = os.path.join("server", "00000000.oas")
+    ae_ckpt = "server/inference/init_ae/best_model.pth"
+    reg_ckpt = "server/inference/arch_regressor/best_model.pth"
+    pipeline = OrthoInferencePipeline(ae_ckpt, reg_ckpt)
+    transforms = pipeline.run(base_case_path, template_case_path)
+    print("Transforms for tooth 37:")
+    print(json.dumps(transforms['37'], indent=2, ensure_ascii=False))
+    # Optionally print all transforms or debug info
+    # print(json.dumps(transforms, indent=2, ensure_ascii=False))
