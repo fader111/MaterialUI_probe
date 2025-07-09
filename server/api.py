@@ -143,19 +143,20 @@ def predict_t2(
     ae_ckpt = "server/inference/init_ae/best_model.pth"
     reg_ckpt = "server/inference/arch_regressor/best_model.pth"
     pipeline = OrthoInferencePipeline(ae_ckpt, reg_ckpt)
-    pred = pipeline.run(base_case_path, template_case_path)
-    return pred
+    result = pipeline.run(base_case_path, template_case_path)
+    print(f"result 37 {result['37']}")
+    return result
 
 @app.post("/predict-init/")
-def predict_t2(
-    base_case_id: str = Body(...),
-    template_case_id: str = Body(...)
+def predict_init(
+    base_case_id: str = Body(..., embed=True)
 ):
-    pred = get_predicted_transforms(
-        base_case_id=base_case_id,
-        template_case_id=template_case_id
-    )
-    return pred
+    base_case_path = os.path.join("server", f"{base_case_id}.oas")
+    ae_ckpt = "server/inference/init_ae/best_model.pth"
+    pipeline = OrthoInferencePipeline(ae_ckpt)
+    result = pipeline.run_init_predict(base_case_path)
+    print(f"result 37 {result['37']}")
+    return result
 
 @app.post("/get_stage_relative_transform/")
 def get_stage_relative_transforms_endpoint(payload: dict = Body(...)):

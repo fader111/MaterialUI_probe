@@ -17,6 +17,7 @@ import Slider from '@mui/material/Slider'
 import IconButton from '@mui/material/IconButton'
 import ArrowLeftIcon from '@mui/icons-material/ArrowLeft'
 import ArrowRightIcon from '@mui/icons-material/ArrowRight'
+import { useState } from 'react';
 
 function MenuBar({ onFileLoaded }) {
   const [anchorEls, setAnchorEls] = React.useState({})
@@ -123,7 +124,7 @@ function MenuBar({ onFileLoaded }) {
   )
 }
 
-function LeftPanel({ onShortRootsToggle, shortRoots, onLandmarksToggle, showLandmarks, onPredictT2 }) {
+function LeftPanel({ onShortRootsToggle, shortRoots, onLandmarksToggle, showLandmarks, onPredictT2, onPredictInit }) {
   const buttons = [
     {
       key: 'roots',
@@ -139,6 +140,11 @@ function LeftPanel({ onShortRootsToggle, shortRoots, onLandmarksToggle, showLand
       key: 'predict',
       label: 'Predict T2',
       onClick: onPredictT2
+    },
+    {
+      key: 'predictInit',
+      label: 'Init Predict',
+      onClick: onPredictInit
     }
   ];
   return (
@@ -258,6 +264,36 @@ export default function Overlay({ children, stage, maxStage, onStageChange, onVi
   const [expand, setExpand] = React.useState(false);
   const [moveType, setMoveType] = React.useState(''); // Distalize, Mezialize, ''
 
+  // Handler for Init Predict button
+  const handlePredictInit = async () => {
+    if (!baseCaseFilename) {
+      setStatus('No base case selected');
+      return;
+    }
+    setLoading(true);
+    setStatus('Running Init Predict...');
+    localStorage.setItem('status', 'Running Init Predict...');
+    try {
+      const resp = await fetch('http://localhost:8000/predict-init/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ base_case_id: baseCaseFilename.replace(/\.oas$/, '') })
+      });
+      if (!resp.ok) throw new Error('Server error');
+      const data = await resp.json();
+      setStatus('Init Predict done');
+      // Optionally: do something with data.init_predictions or data.loss
+      // e.g. show a dialog, update state, etc.
+      // console.log('Init Predict result:', data);
+    } catch (err) {
+        setStatus('Init Predict failed');
+        console.error('Init Predict error:', err);
+    } finally {
+        setLoading(false);
+        localStorage.setItem('status', '');
+    }
+  };
+
   return (
     <Box sx={{ height: '100vh', width: '100vw', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1, overflow: 'hidden' }}>
       {/* Main content (scene) in the background */}
@@ -276,6 +312,7 @@ export default function Overlay({ children, stage, maxStage, onStageChange, onVi
             onLandmarksToggle={onLandmarksToggle}
             showLandmarks={showLandmarks}
             onPredictT2={onPredictT2}
+            onPredictInit={handlePredictInit}
           />
         </Box>
         {/* Pattern selection panel */}
