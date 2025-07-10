@@ -153,7 +153,6 @@ export const ToothPlacement = forwardRef((props, ref) => {
     }), [jsonStageVec3, linearStagingData, MAPSStagingData, stage]);
 
     let stagingData = stagingDataSelector[stagingType] || {};
-    let predictedT2;
 
     // Add state to trigger rerender with new T2 prediction
     const [rerenderStageData, setRerenderStagingData] = useState(null);
