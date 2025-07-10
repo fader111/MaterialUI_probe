@@ -43,38 +43,6 @@ def get_cached_ortho_case(file_path="backend/oas/00000000.oas"):
         ortho_case_cache["ortho_case"] = OrthoCase(file_path)
     return ortho_case_cache["ortho_case"]
 
-def get_tooth_relative_transform(tooth, stage):
-    try:
-        rel_transform = tooth.relativeTransform(stage)
-        if rel_transform is None:
-            print(f"[ERROR] Null pointer: relativeTransform({stage}) is None for tooth {getattr(tooth, 'cl_id', 'unknown')}")
-            return None
-        translation = rel_transform.translation
-        rotation = rel_transform.rotation
-        return {
-            "translation": {
-                "x": translation.x, "y": translation.y, "z": translation.z},
-            "rotation": {
-                "x": rotation.im.x, "y": rotation.im.y, "z": rotation.im.z,
-                "w": rotation.re}
-        }
-    except Exception as e:
-        print(f"[ERROR] Exception in getToothRelativeTransform for tooth {getattr(tooth, 'cl_id', 'unknown')}: {e}")
-        return None
-    
-def get_stage_relative_transforms(base_ortho_case, stage=0):
-    stage_data = {}
-    tp = base_ortho_case.get_treatment_plan()
-    
-    for jawType in JawType:
-        jaw = tp.GetJaw(jawType)
-        for tooth in jaw.getTeeth():
-            tooth_id = tooth.getClinicalID()
-            tooth_rt = get_tooth_relative_transform(tooth, stage)
-            stage_data[tooth_id] = tooth_rt
-    
-    return stage_data
-
 @app.get("/oas-files/")
 def list_oas_files():
     files = [os.path.basename(f) for f in glob.glob(os.path.join(OAS_DIR, "*.oas"))]
@@ -143,8 +111,7 @@ def predict_t2(
     ae_ckpt = "server/inference/init_ae/best_model.pth"
     reg_ckpt = "server/inference/arch_regressor/best_model.pth"
     pipeline = OrthoInferencePipeline(ae_ckpt, reg_ckpt)
-    result = pipeline.run(base_case_path, template_case_path)
-    print(f"result 37 {result['37']}")
+    result = pipeline.run_t2_predict(base_case_path, template_case_path)
     return result
 
 @app.post("/predict-init/")
@@ -155,17 +122,7 @@ def predict_init(
     ae_ckpt = "server/inference/init_ae/best_model.pth"
     pipeline = OrthoInferencePipeline(ae_ckpt)
     result = pipeline.run_init_predict(base_case_path)
-    print(f"result 37 {result['37']}")
     return result
-
-@app.post("/get_stage_relative_transform/")
-def get_stage_relative_transforms_endpoint(payload: dict = Body(...)):
-    print("[get_stage_relative_transforms_endpoint] Received payload:", payload)
-    file_path = payload.get("file_path", "backend/oas/00000000.oas")
-    stage = payload.get("stage", 0)
-    ortho_case = get_cached_ortho_case(file_path)
-    ans = get_stage_relative_transforms(ortho_case, stage=stage)
-    return ans
 
 @app.post("/get_teeth_meshes/")
 async def get_teeth_meshes(payload: dict = Body(...)):

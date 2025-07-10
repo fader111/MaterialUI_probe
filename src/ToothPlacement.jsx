@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useImperativeHandle, forwardRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, forwardRef } from 'react';
 import * as THREE from 'three';
 import { Tooth } from './Tooth';
 // import { Tooth } from './ToothRotated';
@@ -9,6 +9,7 @@ export const ToothPlacement = forwardRef((props, ref) => {
         trackballControlsRef, 
         setControlsEnabled, 
         orthoData,
+        setOrthoData,
         stage,
         // onStagingDataUpdate, // Not in the Ortho!! remove?? 
         stagingPatterns, 
@@ -155,24 +156,19 @@ export const ToothPlacement = forwardRef((props, ref) => {
     let stagingData = stagingDataSelector[stagingType] || {};
 
     // Add state to trigger rerender with new T2 prediction
-    const [rerenderStageData, setRerenderStagingData] = useState(null);
+    // const [rerenderStageData, setRerenderStagingData] = useState(null);
 
     const handleToothTransform = useCallback((toothId, transforms) => {
-        if (jsonStagingData && jsonStagingData[stage]) {
+        if (orthoData?.Staging && orthoData.Staging[stage]) {
             const jawTranslation = toothId > 30 ? mandibulaRt.translation : maxillaRt.translation;
             const jawRotation = toothId > 30 ? mandibulaRt.quaternion : maxillaRt.quaternion;
-
-            // Convert from global back to local space
-            const localTranslation = transforms.translation//.clone().sub(jawTranslation);
-            // Create Quaternion from rotation object
+            const localTranslation = transforms.translation;
             const localRotation = new THREE.Quaternion(
                 transforms.rotation.x,
                 transforms.rotation.y,
                 transforms.rotation.z,
                 transforms.rotation.w
             );
-            // localRotation.premultiply(jawRotation.clone().invert());
-
             const localTransforms = {
                 translation: localTranslation,
                 rotation: {
@@ -182,81 +178,20 @@ export const ToothPlacement = forwardRef((props, ref) => {
                     w: localRotation.w
                 }
             };
-
-            const updatedStagingData = [...jsonStagingData];
-            updatedStagingData[stage] = {
-                ...updatedStagingData[stage],
-                RelativeToothTransforms: {
-                    ...updatedStagingData[stage].RelativeToothTransforms,
-                    [toothId]: {
-                        ...updatedStagingData[stage].RelativeToothTransforms[toothId],
-                        translation: localTransforms.translation,
-                        rotation: localTransforms.rotation
-                    }
-                }
-            };
-            console.log("updatedStagingData", stage, updatedStagingData[stage])
-            // onStagingDataUpdate(updatedStagingData);
-        }
-    // }, [jsonStagingData, stage, onStagingDataUpdate, mandibulaRt, maxillaRt]);
-    }, [jsonStagingData, stage, mandibulaRt, maxillaRt]);
-
-    // Handler to call AI prediction endpoint (moved from Overlay)
-    const handlePredictT2 = async (setLoadingPrediction, setPredictionError) => {
-        console.log('handlePredictT2 called in ToothPlacement');
-        setLoadingPrediction(true);
-        setPredictionError(null);
-        try {
-            // console.log('baseCaseFilename', baseCaseFilename);
-            const base_case_id = baseCaseFilename || '00000000';
-            
-            // Set template case ID - Need to be set from parent NOW hardcoded for testing
-            // const template_case_id = '00000000';
-            // const template_case_id = '103931_8.3';
-            const template_case_id = '103931_8.4';
-            // const template_case_id = '120076'; // Peydro Case
-            // const template_case_id = 'Paula_Martinez_Otalo_907080_P'; // Peydro Case
-            // const template_case_id = '912559';
-            
-            // const template_case_id = "1623883_1.4"
-            // const template_case_id = baseCaseFilename
-            
-            console.log('Sending fetch to /predict-t2/', base_case_id, template_case_id);
-            const response = await fetch('http://localhost:8000/predict-t2/', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ base_case_id, template_case_id })
-            });
-            console.log('Fetch response:', response);
-            if (!response.ok) {
-                throw new Error('Prediction failed');
-            }
-            const prediction = await response.json();
-            const toothIDs = Object.keys(prediction);
-            const newTransforms = {};
-
-            toothIDs.forEach(toothID => {
-                // const t1 = jsonT1Vec3[toothID];
-                const pred = rt(prediction[toothID]);
-                const newQuaternion = pred.quaternion.clone();
-                const newPosition = pred.translation.clone();
-                const jawTranstation = toothID > 30 ? mandibulaRt.translation : maxillaRt.translation;
-                newPosition.add(jawTranstation); // Adjust position by jaw translation
-                // jaw rotation?!
-                newTransforms[toothID] = {
-                    position: newPosition,
-                    quaternion: newQuaternion
+            setOrthoData(prev => {
+                if (!prev || !prev.Staging) return prev;
+                const newOrthoData = { ...prev, Staging: [...prev.Staging] };
+                const newStage = { ...newOrthoData.Staging[stage], RelativeToothTransforms: { ...newOrthoData.Staging[stage].RelativeToothTransforms } };
+                newStage.RelativeToothTransforms[toothId] = {
+                    ...newStage.RelativeToothTransforms[toothId],
+                    translation: localTransforms.translation,
+                    rotation: localTransforms.rotation
                 };
+                newOrthoData.Staging[stage] = newStage;
+                return newOrthoData;
             });
-            setRerenderStagingData(newTransforms); // <-- trigger rerender
-        } catch (err) {
-            console.error('Error in handlePredictT2:', err);
-            setPredictionError(err.message);
-        } finally {
-            setLoadingPrediction(false);
         }
-    };
-    useImperativeHandle(ref, () => ({ handlePredictT2 }));
+    }, [orthoData, stage, mandibulaRt, maxillaRt, setOrthoData]);
 
     // Local state for showMode if not controlled
     const [showMode, setShowMode] = useState(showModeProp);
@@ -264,8 +199,8 @@ export const ToothPlacement = forwardRef((props, ref) => {
     React.useEffect(() => { setShowMode(showModeProp); }, [showModeProp]);
 
     // Only R3F objects inside group
-    // Use rerenderStageData if present, otherwise use computed stagingData
-    const currentStageData = rerenderStageData && stage == stagesNum -1 ? rerenderStageData : stagingData;
+    // Use computed stagingData only
+    const currentStageData = stagingData;
     // console.log("rerenderStageData", rerenderStageData);
     // console.log("currentStage Data", stage, currentStageData);
 

@@ -109,26 +109,6 @@ class ArchFormRegressor(nn.Module):
         out = self.net(x)
         return out.view(-1, self.num_teeth, self.num_points, self.coord_dim)
 
-
-def getToothRelativeTransform(tooth, stage):
-    try:
-        rel_transform = tooth.relativeTransform(stage)
-        if rel_transform is None:
-            print(f"[ERROR] Null pointer: relativeTransform({stage}) is None for tooth {getattr(tooth, 'cl_id', 'unknown')}")
-            return None
-        translation = rel_transform.translation
-        rotation = rel_transform.rotation
-        return {
-            "translation": {
-                "x": translation.x, "y": translation.y, "z": translation.z},
-            "rotation": {
-                "x": rotation.im.x, "y": rotation.im.y, "z": rotation.im.z,
-                "w": rotation.re}
-        }
-    except Exception as e:
-        print(f"[ERROR] Exception in getToothRelativeTransform for tooth {getattr(tooth, 'cl_id', 'unknown')}: {e}")
-        return None
-
 class OrthoCaseLoader:
     def __init__(self, file_path):
         with suppress_stdout_stderr():
@@ -177,7 +157,45 @@ class OrthoInferencePipeline:
     def __init__(self, ae_ckpt, reg_ckpt=None):
         self.ae = AutoencoderInference(ae_ckpt)
         self.reg = ArchRegressorInference(reg_ckpt) if reg_ckpt else None
-    def run(self, base_case_path, template_case_path):
+
+    @staticmethod
+    def _get_tooth_relative_transform(tooth, stage):
+        try:
+            rel_transform = tooth.relativeTransform(stage)
+            if rel_transform is None:
+                print(f"[ERROR] Null pointer: relativeTransform({stage}) is None for tooth {getattr(tooth, 'cl_id', 'unknown')}")
+                return None
+            translation = rel_transform.translation
+            rotation = rel_transform.rotation
+            return {
+                "translation": {
+                    "x": translation.x, "y": translation.y, "z": translation.z},
+                "rotation": {
+                    "x": rotation.im.x, "y": rotation.im.y, "z": rotation.im.z,
+                    "w": rotation.re}
+            }
+        except Exception as e:
+            print(f"[ERROR] Exception in getToothRelativeTransform for tooth {getattr(tooth, 'cl_id', 'unknown')}: {e}")
+            return None
+
+    def _compose_transforms(self, base_loader, predictions, base_case_points_t1):
+        transforms_dict = {}
+        for tooth_idx, tooth_id in enumerate(dw_teeth_nums14 + up_teeth_nums14):
+            tooth_points_t1 = base_case_points_t1[tooth_idx]
+            tooth_points_pred = predictions[tooth_idx]
+            tooth = base_loader.get_tooth_by_cl_id(tooth_id)
+            toothRT0 = self._get_tooth_relative_transform(tooth, 0)
+            if toothRT0 is None:
+                print(f"[ERROR] Skipping tooth {tooth_id} not presented.")
+                continue
+            t1_matrix = get_transform_matrix(toothRT0)
+            pred_matrix = calc_transform_matrix_fr_points(tooth_points_t1, tooth_points_pred)
+            total_matrix = pred_matrix @ t1_matrix
+            tooth_transform = get_transform_from_matrix(total_matrix)
+            transforms_dict[str(tooth_id)] = tooth_transform
+        return transforms_dict
+
+    def run_t2_predict(self, base_case_path, template_case_path):
         base_loader = OrthoCaseLoader(base_case_path)
         template_loader = OrthoCaseLoader(template_case_path)
         base_case_points_t1, base_case_points_t2 = base_loader.get_landmarks()
@@ -192,41 +210,16 @@ class OrthoInferencePipeline:
         # Regressor prediction
         predictions, _ = self.reg.predict(init_predictions, template_input, template_points_t2) if self.reg else (init_predictions, 0)
         # Compose transforms
-        transforms_dict = {}
-        for tooth_idx, tooth_id in enumerate(dw_teeth_nums14 + up_teeth_nums14):
-            tooth_points_t1 = base_case_points_t1[tooth_idx]
-            tooth_points_pred = predictions[tooth_idx]
-            tooth = base_loader.get_tooth_by_cl_id(tooth_id)
-            toothRT0 = getToothRelativeTransform(tooth, 0)
-            if toothRT0 is None:
-                print(f"[ERROR] Skipping tooth {tooth_id} not presented.")
-                continue
-            t1_matrix = get_transform_matrix(toothRT0)
-            pred_matrix = calc_transform_matrix_fr_points(tooth_points_t1, tooth_points_pred)
-            total_matrix = pred_matrix @ t1_matrix
-            tooth_transform = get_transform_from_matrix(total_matrix)
-            transforms_dict[str(tooth_id)] = tooth_transform
+        transforms_dict = self._compose_transforms(base_loader, predictions, base_case_points_t1)
         print(f"T2 inference done (class pipeline)")
         return transforms_dict
+
     def run_init_predict(self, base_case_path):
         base_loader = OrthoCaseLoader(base_case_path)
         base_case_points_t1, base_case_points_t2 = base_loader.get_landmarks()
         init_predictions, loss = self.ae.predict(base_case_points_t1, base_case_points_t2)
         # Compose transforms (same as in run, but using AE predictions only)
-        transforms_dict = {}
-        for tooth_idx, tooth_id in enumerate(dw_teeth_nums14 + up_teeth_nums14):
-            tooth_points_t1 = base_case_points_t1[tooth_idx]
-            tooth_points_pred = init_predictions[tooth_idx]
-            tooth = base_loader.get_tooth_by_cl_id(tooth_id)
-            toothRT0 = getToothRelativeTransform(tooth, 0)
-            if toothRT0 is None:
-                print(f"[ERROR] Skipping tooth {tooth_id} not presented.")
-                continue
-            t1_matrix = get_transform_matrix(toothRT0)
-            pred_matrix = calc_transform_matrix_fr_points(tooth_points_t1, tooth_points_pred)
-            total_matrix = pred_matrix @ t1_matrix
-            tooth_transform = get_transform_from_matrix(total_matrix)
-            transforms_dict[str(tooth_id)] = tooth_transform
+        transforms_dict = self._compose_transforms(base_loader, init_predictions, base_case_points_t1)
         print(f"Init inference done (class pipeline)")
         return transforms_dict
 

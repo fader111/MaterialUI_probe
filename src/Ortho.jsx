@@ -35,7 +35,7 @@ export default function Ortho(props) {
   const controlsRef = useRef(null);
   let [ showMode, setShowMode ] = useState(2); // <-- now controlled here
   const toothPlacementRef = useRef(null);
-  const [orthoData, setOrthoData] = useState([]);
+  const [orthoData, setOrthoData] = useState([]); // ensure orthoData is managed here
   const [controlsEnabled, setControlsEnabled] = useState(true);
   const [meshVersion, setMeshVersion] = useState(Date.now());
   // New state for left panel
@@ -168,14 +168,66 @@ export default function Ortho(props) {
   // Handler for left panel
   const handleShortRootsToggle = useCallback(() => setShortRoots(v => !v), []);
   const handleLandmarksToggle = useCallback(() => setShowLandmarks(v => !v), []);
-  const handlePredictT2 = useCallback(() => {
-    // You can call a method on the ToothPlacement ref if needed
-    if (toothPlacementRef.current && toothPlacementRef.current.handlePredictT2) {
-      toothPlacementRef.current.handlePredictT2(() => {}, () => {});
-    } else {
-      alert('Predict T2 not implemented');
+  
+  // Handler for T2 prediction (refactored to update orthoData.Staging)
+  const handlePredictT2 = useCallback(async () => {
+    try {
+      const base_case_id = baseCaseFilename || '00000000';
+      const template_case_id = '103931_8.4'; // TODO: make dynamic if needed
+      const response = await fetch('http://localhost:8000/predict-t2/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ base_case_id, template_case_id })
+      });
+      if (!response.ok) {
+        throw new Error('Prediction failed');
+      }
+      const prediction = await response.json();
+      setOrthoData(prev => {
+        if (!prev || !prev.Staging) return prev;
+        const newOrthoData = { ...prev, Staging: [...prev.Staging] };
+        const stageIdx = newOrthoData.Staging.length - 1; // or use current stage
+        const newStage = { ...newOrthoData.Staging[stageIdx], RelativeToothTransforms: { ...newOrthoData.Staging[stageIdx].RelativeToothTransforms } };
+        for (const toothID in prediction) {
+          newStage.RelativeToothTransforms[toothID] = prediction[toothID];
+        }
+        newOrthoData.Staging[stageIdx] = newStage;
+        return newOrthoData;
+      });
+    } catch (err) {
+      // Optionally handle error UI here
+      console.error(err);
     }
-  }, []);
+  }, [baseCaseFilename]);
+
+  // Handler for Init Predict (now updates orthoData.Staging like handlePredictT2)
+  const handlePredictInit = useCallback(async () => {
+    if (!baseCaseFilename) {
+      return;
+    }
+    try {
+      const resp = await fetch('http://localhost:8000/predict-init/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ base_case_id: baseCaseFilename.replace(/\.oas$/, '') })
+      });
+      if (!resp.ok) throw new Error('Server error');
+      const prediction = await resp.json();
+      setOrthoData(prev => {
+        if (!prev || !prev.Staging) return prev;
+        const newOrthoData = { ...prev, Staging: [...prev.Staging] };
+        const stageIdx = newOrthoData.Staging.length - 1; // or use current stage
+        const newStage = { ...newOrthoData.Staging[stageIdx], RelativeToothTransforms: { ...newOrthoData.Staging[stageIdx].RelativeToothTransforms } };
+        for (const toothID in prediction) {
+          newStage.RelativeToothTransforms[toothID] = prediction[toothID];
+        }
+        newOrthoData.Staging[stageIdx] = newStage;
+        return newOrthoData;
+      });
+    } catch (err) {
+      console.error('Init Predict error:', err);
+    }
+  }, [baseCaseFilename]);
 
   return (
     <div style={{ width: '100%', height: '100%' }}>
@@ -193,6 +245,7 @@ export default function Ortho(props) {
         onLandmarksToggle={handleLandmarksToggle}
         showLandmarks={showLandmarks}
         onPredictT2={handlePredictT2}
+        onPredictInit={handlePredictInit}
         stage={stage}
         maxStage={T2Stage}
         onStageChange={setStage}
@@ -211,6 +264,7 @@ export default function Ortho(props) {
           <ToothPlacement
             ref={toothPlacementRef}
             orthoData={orthoData}
+            setOrthoData={setOrthoData}
             stage={stage}
             showMode={showMode}
             onShowModeChange={setShowMode}

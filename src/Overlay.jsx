@@ -236,7 +236,7 @@ function RightPanel({ onViewSelect }) {
   )
 }
 
-export default function Overlay({ children, stage, maxStage, onStageChange, onViewSelect, onShortRootsToggle, shortRoots, onLandmarksToggle, showLandmarks, onPredictT2, onFileLoaded, baseCaseFilename }) {
+export default function Overlay({ children, stage, maxStage, onStageChange, onViewSelect, onShortRootsToggle, shortRoots, onLandmarksToggle, showLandmarks, onPredictT2, onPredictInit, onFileLoaded, baseCaseFilename }) {
   const [status, setStatus] = React.useState(() => localStorage.getItem('status') || '');
   const [loading, setLoading] = React.useState(false);
   const loadingRef = React.useRef(false);
@@ -264,36 +264,6 @@ export default function Overlay({ children, stage, maxStage, onStageChange, onVi
   const [expand, setExpand] = React.useState(false);
   const [moveType, setMoveType] = React.useState(''); // Distalize, Mezialize, ''
 
-  // Handler for Init Predict button
-  const handlePredictInit = async () => {
-    if (!baseCaseFilename) {
-      setStatus('No base case selected');
-      return;
-    }
-    setLoading(true);
-    setStatus('Running Init Predict...');
-    localStorage.setItem('status', 'Running Init Predict...');
-    try {
-      const resp = await fetch('http://localhost:8000/predict-init/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ base_case_id: baseCaseFilename.replace(/\.oas$/, '') })
-      });
-      if (!resp.ok) throw new Error('Server error');
-      const data = await resp.json();
-      setStatus('Init Predict done');
-      // Optionally: do something with data.init_predictions or data.loss
-      // e.g. show a dialog, update state, etc.
-      // console.log('Init Predict result:', data);
-    } catch (err) {
-        setStatus('Init Predict failed');
-        console.error('Init Predict error:', err);
-    } finally {
-        setLoading(false);
-        localStorage.setItem('status', '');
-    }
-  };
-
   return (
     <Box sx={{ height: '100vh', width: '100vw', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1, overflow: 'hidden' }}>
       {/* Main content (scene) in the background */}
@@ -312,7 +282,7 @@ export default function Overlay({ children, stage, maxStage, onStageChange, onVi
             onLandmarksToggle={onLandmarksToggle}
             showLandmarks={showLandmarks}
             onPredictT2={onPredictT2}
-            onPredictInit={handlePredictInit}
+            onPredictInit={onPredictInit}
           />
         </Box>
         {/* Pattern selection panel */}
