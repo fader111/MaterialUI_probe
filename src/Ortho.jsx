@@ -174,6 +174,7 @@ export default function Ortho(props) {
     try {
       const base_case_id = baseCaseFilename || '00000000';
       const template_case_id = '103931_8.4'; // TODO: make dynamic if needed
+      // const template_case_id = '00000000' // TODO: make dynamic if needed
       const response = await fetch('http://localhost:8000/predict-t2/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

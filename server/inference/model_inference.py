@@ -200,11 +200,21 @@ class OrthoInferencePipeline:
         template_loader = OrthoCaseLoader(template_case_path)
         base_case_points_t1, base_case_points_t2 = base_loader.get_landmarks()
         template_points_t1, template_points_t2 = template_loader.get_landmarks()
+
+        # Apply transformations to base case points
+        # tp.GetJaw(jawType).relativeTransform(0)
+        base_mandible_jaw_transform = base_loader.ortho_case.tp.GetJaw(JawType.Mandible).relativeTransform(0)
+        base_maxilla_jaw_transform = base_loader.ortho_case.tp.GetJaw(JawType.Maxilla).relativeTransform(0)
+        template_mandible_jaw_transform = template_loader.ortho_case.tp.GetJaw(JawType.Mandible).relativeTransform(0)
+        template_maxilla_jaw_transform = template_loader.ortho_case.tp.GetJaw(JawType.Maxilla).relativeTransform(0)
+
+        print(f"mandible_jaw_tr {base_mandible_jaw_transform} type {type(base_mandible_jaw_transform)}")
+
         template_input = template_points_t2 - template_points_t1
         # Prepare template input (invert x and y) wich is strange behaviour!!!! check frontend!!!
-        template_input = template_input.copy()
-        template_input[..., 0] *= -1
-        template_input[..., 1] *= -1
+        # template_input = template_input.copy()
+        # template_input[..., 0] *= -1
+        # template_input[..., 1] *= -1
         # AE prediction
         init_predictions, _ = self.ae.predict(base_case_points_t1, base_case_points_t2)
         # Regressor prediction

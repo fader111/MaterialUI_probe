@@ -62,7 +62,7 @@ export const ToothPlacement = forwardRef((props, ref) => {
         let t1Vec3 = {};
         let t2Vec3 = {};
 
-        // console.log("from toothplace useMemo", " stagesNum", stagesNum, "stage", stage);
+        console.log("from toothplace useMemo", " stagesNum", stagesNum, "stage", stage);
         // console.log("stagingDataT2.RelativeToothTransforms[11]", stagingDataT2.RelativeToothTransforms[11]);
         if (jsonStagingData && stagesNum > 0) {
             // console.log("mandibularOcclusalToJawTransform", mandibularOcclusalToJawTransform); 
@@ -73,32 +73,35 @@ export const ToothPlacement = forwardRef((props, ref) => {
                 const toothRt = rt(jsonStagingData[stage].RelativeToothTransforms[toothID]);
                 const toothRtT1 = rt(stagingDataT1.RelativeToothTransforms[toothID]);
                 const toothRtT2 = rt(stagingDataT2.RelativeToothTransforms[toothID]);
-                // console.log(toothID, "toothRtT2", toothRtT2);
                 const jawTranstation = toothID > 30 ? mandibulaRt.translation : maxillaRt.translation;
                 const jawRotation = toothID > 30 ? mandibulaRt.quaternion : maxillaRt.quaternion;
-                const occlusalTransform = toothID > 30 ? rt(mandibularOcclusalToJawTransform) : rt(maxillaOcclusalToJawTransform);
                 
                 stageVec3[toothID] = {
-                    // position: toothRt.translation,
-                    position: toothRt.translation.add(jawTranstation),//.sub(occlusalTransform.translation),
-                    // position: toothRt.translation,//.sub(occlusalTransform.translation),
-                    // quaternion: toothRt.quaternion//.multiply(jawRotation)
-                    quaternion: toothRt.quaternion//.premultiply(occlusalTransform.quaternion.clone().invert())
-                    // quaternion: occlusalTransform.quaternion.clone().invert().multiply(toothRt.quaternion)
+                    position: toothRt.translation
+                        .clone()
+                        .applyQuaternion(jawRotation)
+                        .add(jawTranstation),
+                    quaternion: jawRotation
+                        .clone()
+                        .multiply(toothRt.quaternion)
                 };
                 t1Vec3[toothID] = {
-                    // position: toothRtT1.translation.add(occlusalTransform.translation),
-                    // position: toothRtT1.translation,//.add(jawTranstation),
-                    position: toothRtT1.translation.add(jawTranstation),//.sub(occlusalTransform.translation),
-                    // quaternion: toothRtT1.quaternion.multiply(occlusalTransform.quaternion)
-                    quaternion: toothRtT1.quaternion//.multiply(jawRotation)
+                    position: toothRtT1.translation
+                        .clone()
+                        .applyQuaternion(jawRotation)
+                        .add(jawTranstation),
+                    quaternion: jawRotation
+                        .clone()
+                        .multiply(toothRtT1.quaternion)
                 };
                 t2Vec3[toothID] = {
-                    // position: toothRtT2.translation,//.add(jawTranstation),
-                    position: toothRtT2.translation.add(jawTranstation),//.sub(occlusalTransform.translation),
-                    // position: toothRtT2.translation.add(occlusalTransform.translation),
-                    quaternion: toothRtT2.quaternion//.multiply(jawRotation)
-                    // quaternion: toothRtT2.quaternion.multiply(occlusalTransform.quaternion)
+                    position: toothRtT2.translation
+                        .clone()
+                        .applyQuaternion(jawRotation)
+                        .add(jawTranstation),
+                    quaternion: jawRotation
+                        .clone()
+                        .multiply(toothRtT2.quaternion)
                 };
             }
         }
