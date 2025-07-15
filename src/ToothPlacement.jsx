@@ -62,7 +62,7 @@ export const ToothPlacement = forwardRef((props, ref) => {
         let t1Vec3 = {};
         let t2Vec3 = {};
 
-        console.log("from toothplace useMemo", " stagesNum", stagesNum, "stage", stage);
+        // console.log("from toothplace useMemo", " stagesNum", stagesNum, "stage", stage);
         // console.log("stagingDataT2.RelativeToothTransforms[11]", stagingDataT2.RelativeToothTransforms[11]);
         if (jsonStagingData && stagesNum > 0) {
             // console.log("mandibularOcclusalToJawTransform", mandibularOcclusalToJawTransform); 
@@ -84,6 +84,7 @@ export const ToothPlacement = forwardRef((props, ref) => {
                     quaternion: jawRotation
                         .clone()
                         .multiply(toothRt.quaternion)
+                    // quaternion: toothRt.quaternion
                 };
                 t1Vec3[toothID] = {
                     position: toothRtT1.translation

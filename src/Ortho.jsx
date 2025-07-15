@@ -53,36 +53,58 @@ export default function Ortho(props) {
   });
 
   // Initial data fetch  
+  // useEffect(() => {
+  //   const fetchOrthoData = async () => {
+  //     try {
+  //       const response = await fetch('/orthoData.json');
+  //       if (!response.ok) {
+  //         throw new Error('Error fetching case data');
+  //       }
+  //       const data = await response.json();
+  //       setOrthoData(data);
+  //       // console.log('Initial ortho data loaded:', orthoData); // тут пусто обычно!!!
+  //     } catch (error) {
+  //       console.error(error);
+  //     }
+  //   };
+  //   fetchOrthoData();
+  // }, []); // Only run on mount
+
+  // Initial data fetch 
   useEffect(() => {
-    const fetchOrthoData = async () => {
+    const fetchOrthoData = async() => {
+      const base_case_id = '00000000';
       try {
-        const response = await fetch('/orthoData.json');
-        if (!response.ok) {
-          throw new Error('Error fetching case data');
-        }
+        const response = await fetch("http://localhost:8000/get_case_data/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({base_case_id})
+        });
         const data = await response.json();
         setOrthoData(data);
-        // console.log('Initial ortho data loaded:', orthoData); // тут пусто обычно!!!
       } catch (error) {
         console.error(error);
       }
-    };
+    }
     fetchOrthoData();
   }, []); // Only run on mount
 
   // Handler to reload orthoData after file upload/processing
   const handleFileLoaded = useCallback(async (filename) => {
     try {
-      const timestamp = Date.now();
-      const response = await fetch(`/orthoData.json?_=${timestamp}`); // cache-busting
+      const base_case_id = filename.replace(/\.oas$/i, ''); // Extract base_case_id from filename
+      const response = await fetch("http://localhost:8000/get_case_data/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ base_case_id })
+      });
       if (!response.ok) throw new Error('Failed to reload orthoData');
       const data = await response.json();
-      setMeshVersion(timestamp);
       setOrthoData(data);
-      const cleanFilename = filename.replace(/\.oas$/i, '');
-      setBaseCaseFilename(cleanFilename);
+      setMeshVersion(Date.now());
+      setBaseCaseFilename(base_case_id);
       try {
-        localStorage.setItem('baseCaseFilename', cleanFilename);
+        localStorage.setItem('baseCaseFilename', base_case_id);
       } catch (e) {
         // Ignore localStorage errors
       }
@@ -173,8 +195,9 @@ export default function Ortho(props) {
   const handlePredictT2 = useCallback(async () => {
     try {
       const base_case_id = baseCaseFilename || '00000000';
-      const template_case_id = '103931_8.4'; // TODO: make dynamic if needed
-      // const template_case_id = '00000000' // TODO: make dynamic if needed
+      // const base_case_id = baseCaseFilename || '742608';
+      // const template_case_id = '103931_8.4'; // TODO: make dynamic if needed
+      const template_case_id = '120076_1'; // TODO: make dynamic if needed
       const response = await fetch('http://localhost:8000/predict-t2/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

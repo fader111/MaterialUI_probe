@@ -7,6 +7,7 @@ import shutil
 import glob
 from subprocess import run, PIPE
 import sys
+from autosetup_ml.utils import *
 from server.inference.model_inference import OrthoInferencePipeline
 from fastapi import Body
 
@@ -94,7 +95,8 @@ def export_teeth(request: ExportTeethRequest):
         raise HTTPException(status_code=404, detail="OAS file not found")
     # Run the export teeth and json data script
     result = run([
-        sys.executable, os.path.join(os.path.dirname(__file__), "export_teeth_and_json_data.py"),
+        # sys.executable, os.path.join(os.path.dirname(__file__), "export_teeth_and_json_data.py"), old one
+        sys.executable, os.path.join(os.path.dirname(__file__), "export_teeth_.py"),
         "--filename", oas_path
     ], stdout=PIPE, stderr=PIPE, text=True)
     if result.returncode != 0:
@@ -149,3 +151,99 @@ async def get_teeth_meshes(payload: dict = Body(...)):
     with ThreadPoolExecutor() as executor:
         results = list(executor.map(process_one, tooth_ids))
     return dict(zip(tooth_ids, results))
+
+@app.post("/get_case_data/")
+async def get_case_data(base_case_id: str = Body(..., embed=True)):
+    """
+    Returns case data including staging and tooth transforms.
+    Accepts: { file_path: str }
+    """
+    base_case_path = os.path.join("server", f"{base_case_id}.oas")
+    print(f"file_path {base_case_path}")
+    ortho_case = get_cached_ortho_case(base_case_path)
+    ortho_data = OrthoData(ortho_case)
+    return ortho_data.ortho_data
+
+
+class OrthoData():
+
+    def __init__(self, ortho_case: OrthoCase):
+        self.ortho_case = ortho_case
+        self.caseID = self.ortho_case.caseID
+        self.tp = self.ortho_case.get_treatment_plan()
+        self.t2 = max([self.tp.GetJaw(jaw).GetT2() for jaw in JawType])
+        self.ortho_data = {
+            "CaseID": str(self.caseID),
+            "T2Stage": str(self.t2),
+            "mandibularRelativeTransform": self.getJawRelativeTransform(JawType.Mandible),
+            "maxillaRelativeTransform": self.getJawRelativeTransform(JawType.Maxilla),
+            "Staging": self.getStagingData()
+        }
+
+    def getPoints(self, point):
+        return {
+            "x": point.x,
+            "y": point.y,
+            "z": point.z
+        }
+    
+    def getToothRelativeTransform(self, tooth, stage):
+        translation = tooth.relativeTransform(stage).translation
+        rotation = tooth.relativeTransform(stage).rotation
+        return {
+            "translation": {
+                "x": translation.x, "y": translation.y, "z": translation.z},
+            "rotation": {
+                "x": rotation.im.x, "y": rotation.im.y, "z": rotation.im.z,
+                "w": rotation.re}
+        }
+
+    def getJawRelativeTransform(self, jawType):
+        jaw = self.tp.GetJaw(jawType)
+        rt = jaw.relativeTransform(0)
+        translation = rt.translation
+        rotation = rt.rotation
+        return {
+            "translation": {"x": translation.x, "y": translation.y, "z": translation.z},
+            "rotation": {"x": rotation.im.x, "y": rotation.im.y, "z": rotation.im.z, "w": rotation.re}
+        }
+
+    def getStagingData(self):
+        staging_data = []
+        for stage_number, stage in enumerate(range(0, self.t2)):
+            # из стейджинга понадобятся MandibularTransform, MaxillaryTransform, RelativeToothTransforms, Landmarks
+            stage_data = {}
+            stage_data["Stage"] = stage_number
+
+            # collect RelativeToothTransforms
+            relativeToothTransforms = {}
+            for jawType in JawType:
+                jaw = self.tp.GetJaw(jawType)
+                for tooth in jaw.getTeeth():
+                    relativeToothTransforms[str(
+                        tooth.getClinicalID())] = self.getToothRelativeTransform(tooth, stage)
+            stage_data["RelativeToothTransforms"] = relativeToothTransforms
+
+            # collect Landmarks
+            lm_dict = {"BCPoint": LandmarkID.BCPoint,
+                    "FEGJPoint": LandmarkID.FEGJPoint,
+                    "MRAPoint": LandmarkID.MeanRootApex,
+                    #   "MDWLine":LandmarkID.MDWLine, # TODO fix
+                    }
+
+            landmarks = {}
+            for jawType in JawType:
+                jaw = self.tp.GetJaw(jawType)
+                for tooth in jaw.getTeeth():
+                    tooth_landmarks = {}
+                    for lm in lm_dict:
+                        tooth_landmarks[lm] = self.getPoints(
+                            tooth.getLandmarks().getPoint(lm_dict[lm]))
+                    landmarks[str(tooth.getClinicalID())] = tooth_landmarks
+
+            stage_data["Landmarks"] = landmarks
+
+            staging_data.append(stage_data)
+
+        return staging_data
+        
