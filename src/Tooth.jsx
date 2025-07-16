@@ -13,14 +13,21 @@ export function Tooth(props) {
   const toothRef = useRef(); 
 
   // Fallback error state for STL loading
-  const [loadError, setLoadError] = useState(false);
+  // const [loadError, setLoadError] = useState(false);
 
-  // STL loading with error handling
-  const crown = useLoader(STLLoader, `/crowns/${toothID}.stl?ts=${props.meshVersion}`, loader => `${toothID}-crown-${props.meshVersion}`);
-  const root = useLoader(STLLoader, useShortRoots ? 
-    `/shortRoots/${toothID}.stl?ts=${props.meshVersion}` : 
-    `/roots/${toothID}.stl?ts=${props.meshVersion}`,
-    loader => `${toothID}-root-${props.meshVersion}`
+  // STL loading 
+  const caseId = props.baseCaseFilename || props.meshVersion;
+  const crown = useLoader(
+    STLLoader,
+    `/crowns/${toothID}.stl?case=${caseId}`,
+    loader => `${toothID}-crown-${caseId}`
+  );
+  const root = useLoader(
+    STLLoader,
+    useShortRoots
+      ? `/shortRoots/${toothID}.stl?case=${caseId}`
+      : `/roots/${toothID}.stl?case=${caseId}`,
+    loader => `${toothID}-root-${caseId}`
   );
   const texture = useLoader(TextureLoader, `/textures/teeth.png`);
 
@@ -92,6 +99,7 @@ export function Tooth(props) {
 
   // render meshContent 
   const meshContent = (
+    // toothID == '11' ? console.log("rendering meshContent for tooth", toothID, "with position:", position, "and quaternion:", quaternion):null,
     <group
       ref={toothRef}
       position={position}
@@ -171,8 +179,8 @@ export function Tooth(props) {
       onTransform(toothID, newTransforms);
       console.log("from handleObjectChange")
     }
-  // }, [toothID, onTransform, initialTransform, isDragging]);
-  }, []);
+  }, [toothID, onTransform, initialTransform, isDragging]);
+  // }, []);
 
   const TransformHint = () => (
     <>
@@ -180,7 +188,7 @@ export function Tooth(props) {
         <Html
           style={{
             position: 'absolute',
-            top: '-280px',      // Moved higher up
+            top: '20%',      // Moved higher up
             left: '50%',
             transform: 'translateX(-50%)',
             background: 'rgba(209, 201, 201, 0.37)',
@@ -221,6 +229,14 @@ export function Tooth(props) {
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [isClicked]);
   
+  // Debug: log transformation data for each tooth
+  // useEffect(() => {
+  //   // console.log(`Tooth ${toothID} stagingData:`, stagingData);
+  //   if (toothID == '11') {
+  //   console.log(`Tooth ${toothID} position:`, position);
+  //   console.log(`Tooth ${toothID} quaternion:`, quaternion);}
+  // }, [toothID, stagingData, position, quaternion]);
+
   return (
     <>
       {meshContent}

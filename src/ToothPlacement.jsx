@@ -33,86 +33,88 @@ export const ToothPlacement = forwardRef((props, ref) => {
         }
     }, []);
 
-    const jsonMandibularData = orthoData?.mandibularRelativeTransform || null;
-    const jsonMaxillaData = orthoData?.maxillaRelativeTransform || null;
-    const jsonStagingData = orthoData?.Staging || null;
+    // const jsonMandibularData = orthoData?.mandibularRelativeTransform || null;
+    // const jsonMaxillaData = orthoData?.maxillaRelativeTransform || null;
+    const caseStagingData = orthoData?.Staging || null;
     // const mandibularOcclusalToJawTransform = orthoData?.mandibularOcclusalToJawTransform || null;
     // const maxillaOcclusalToJawTransform = orthoData?.maxillaOcclusalToJawTransform || null;
     
-    const stagesNum = jsonStagingData ? jsonStagingData.length : 0;
-    const stagingDataT1 = jsonStagingData && stagesNum > 0 ? jsonStagingData[0] : null;
-    const stagingDataT2 = jsonStagingData && stagesNum > 0 ? jsonStagingData[stagesNum - 1] : null;
+    const stagesNum = caseStagingData ? caseStagingData.length : 0;
+    const stagingDataT1 = caseStagingData && stagesNum > 0 ? caseStagingData[0] : null;
+    const stagingDataT2 = caseStagingData && stagesNum > 0 ? caseStagingData[stagesNum - 1] : null;
 
-    // Add baseCaseFilename or orthoData.CaseID to dependencies to ensure recalculation on file change
-    const caseKey = orthoData?.CaseID || orthoData?.caseID || orthoData?.id || '';
-    const mandibulaRt = useMemo(() => {
-        return jsonMandibularData ? rt(jsonMandibularData) : { translation: new THREE.Vector3(), quaternion: new THREE.Quaternion() };
-    }, [jsonMandibularData, caseKey]); // Removed orthoData from dependencies to avoid unnecessary recalculations
-
-    const maxillaRt = useMemo(() => {
-        return jsonMaxillaData ? rt(jsonMaxillaData) : { translation: new THREE.Vector3(), quaternion: new THREE.Quaternion() };
-    }, [jsonMaxillaData, caseKey]); // Removed orthoData from dependencies to avoid unnecessary recalculations
-
+    // Guard: don't render until all required data is loaded
+    if (!caseStagingData || !stagingDataT1 || !stagingDataT2 || !stagingDataT1.RelativeToothTransformsHead['11'].translation) {
+        return null;
+    }
+    // console.log("stagingDataT1.RelativeToothTransformsHead 11 translation:", stagingDataT1.RelativeToothTransformsHead['11'].translation);
+    
     const { jsonT1Vec3, jsonT2Vec3, jsonStageVec3 } = useMemo(() => {
         let stageVec3 = {};
         let t1Vec3 = {};
         let t2Vec3 = {};
 
-        if (jsonStagingData && stagesNum > 0 && stagingDataT1 && stagingDataT2 && stagingDataT2.RelativeToothTransforms && stagingDataT1.RelativeToothTransforms) {
-            for (const toothID in stagingDataT2.RelativeToothTransforms) {
-                const toothRt = rt(jsonStagingData[stage]?.RelativeToothTransforms?.[toothID]);
-                const toothRtT1 = rt(stagingDataT1.RelativeToothTransforms[toothID]);
-                const toothRtT2 = rt(stagingDataT2.RelativeToothTransforms[toothID]);
-                const jawTranstation = toothID > 30 ? mandibulaRt.translation : maxillaRt.translation;
-                const jawRotation = toothID > 30 ? mandibulaRt.quaternion : maxillaRt.quaternion;
+        if (caseStagingData && stagesNum > 0 && stagingDataT1 && stagingDataT2 && stagingDataT1.RelativeToothTransformsHead && stagingDataT2.RelativeToothTransformsHead) {
+            // for (const toothID in stagingDataT2.RelativeToothTransforms) {
+            for (const toothID in stagingDataT2.RelativeToothTransformsHead) {
+                const toothRt = rt(caseStagingData[stage]?.RelativeToothTransformsHead?.[toothID]);
+                // const toothRt = rt(caseStagingData[stage]?.RelativeToothTransforms?.[toothID]);
+                const toothRtT1 = rt(stagingDataT1.RelativeToothTransformsHead[toothID]);
+                const toothRtT2 = rt(stagingDataT2.RelativeToothTransformsHead[toothID]);
+                // const jawTranstation = toothID > 30 ? mandibulaRt.translation : maxillaRt.translation;
+                // const jawRotation = toothID > 30 ? mandibulaRt.quaternion : maxillaRt.quaternion;
 
                 stageVec3[toothID] = {
-                    position: toothRt.translation
-                        .clone()
-                        .applyQuaternion(jawRotation)
-                        .add(jawTranstation),
-                    quaternion: jawRotation
-                        .clone()
-                        .multiply(toothRt.quaternion)
+                    position: toothRt.translation,
+                        // .clone()
+                        // .applyQuaternion(jawRotation)
+                        // .add(jawTranstation),
+                    // quaternion: jawRotation
+                        // .clone()
+                        // .multiply(toothRt.quaternion)
+                    quaternion : toothRt.quaternion
                 };
                 t1Vec3[toothID] = {
-                    position: toothRtT1.translation
-                        .clone()
-                        .applyQuaternion(jawRotation)
-                        .add(jawTranstation),
-                    quaternion: jawRotation
-                        .clone()
-                        .multiply(toothRtT1.quaternion)
+                    position: toothRtT1.translation,
+                        // .clone()
+                        // .applyQuaternion(jawRotation)
+                        // .add(jawTranstation),
+                    // quaternion: jawRotation
+                        // .clone()
+                        // .multiply(toothRtT1.quaternion)
+                    quaternion : toothRtT1.quaternion
                 };
                 t2Vec3[toothID] = {
-                    position: toothRtT2.translation
-                        .clone()
-                        .applyQuaternion(jawRotation)
-                        .add(jawTranstation),
-                    quaternion: jawRotation
-                        .clone()
-                        .multiply(toothRtT2.quaternion)
+                    position: toothRtT2.translation,
+                        // .clone()
+                        // .applyQuaternion(jawRotation)
+                        // .add(jawTranstation),
+                    // quaternion: jawRotation
+                        // .clone()
+                        // .multiply(toothRtT2.quaternion)
+                    quaternion : toothRtT2.quaternion
                 };
             }
         }
         return { jsonT1Vec3: t1Vec3, jsonT2Vec3: t2Vec3, jsonStageVec3: stageVec3 };
-    }, [stagingDataT1, stagingDataT2, stage, mandibulaRt, maxillaRt]); // Removed orthoData to avoid redundant recalculations
+    // }, [stagingDataT1, stagingDataT2, stage, mandibulaRt, maxillaRt]); // Removed orthoData to avoid redundant recalculations
+    }, [caseStagingData, stagingDataT1, stage]);
 
     // Update landmarks
-    useEffect(() => {
-        // Reset landmarks when orthoData changes
-        setLandmarksT1(null);
-    }, [caseKey]); // Changed dependency to caseKey for better granularity
+    // useEffect(() => {
+    //     // Reset landmarks when orthoData changes
+    //     setLandmarksT1(null);
+    // }, [caseKey]); // Changed dependency to caseKey for better granularity
 
     useEffect(() => {
-        if (jsonStagingData && stagesNum > 0 && stagingDataT1 && stagingDataT1.RelativeToothTransforms && stagingDataT1.Landmarks) {
+        if (caseStagingData && stagesNum > 0 ) {
             const landmarksT1_ = {};
-            for (const toothID in stagingDataT1.RelativeToothTransforms) {
-                const toothRt0 = rt(stagingDataT1.RelativeToothTransforms[toothID]);
-                const jawTranstation1 = toothID > 30 ? mandibulaRt.translation : maxillaRt.translation;
-                const jawRotation = toothID > 30 ? mandibulaRt.quaternion : maxillaRt.quaternion;
-                const position0 = toothRt0.translation.add(jawTranstation1);
-                const quaternion0 = toothRt0.quaternion.multiply(jawRotation);
+            for (const toothID in stagingDataT1.RelativeToothTransformsHead) {
+                // const toothRt0 = rt(stagingDataT1.RelativeToothTransformsHead[toothID]);
+                // const jawTranstation1 = toothID > 30 ? mandibulaRt.translation : maxillaRt.translation;
+                // const jawRotation = toothID > 30 ? mandibulaRt.quaternion : maxillaRt.quaternion;
+                // const position0 = toothRt0.translation.add(jawTranstation1);
+                // const quaternion0 = toothRt0.quaternion.multiply(jawRotation);
                 let lmTypes = {};
                 for (const lmType in (stagingDataT1.Landmarks[toothID] || {})) {
                     const lmPoint = toVec3(stagingDataT1.Landmarks[toothID][lmType])
@@ -122,7 +124,8 @@ export const ToothPlacement = forwardRef((props, ref) => {
             }
             setLandmarksT1(landmarksT1_);
         }
-    }, [jsonStagingData, stagingDataT1, mandibulaRt, maxillaRt, stagesNum, orthoData]);
+    // }, [caseStagingData, stagingDataT1, mandibulaRt, maxillaRt, stagesNum, orthoData]);
+    }, [caseStagingData, stagingDataT1, stagesNum]);
 
     const linearStagingData = useMemo(() => {
         // console.log("call LinearStagingData from UseMemo");
@@ -154,8 +157,8 @@ export const ToothPlacement = forwardRef((props, ref) => {
 
     const handleToothTransform = useCallback((toothId, transforms) => {
         if (orthoData?.Staging && orthoData.Staging[stage]) {
-            const jawTranslation = toothId > 30 ? mandibulaRt.translation : maxillaRt.translation;
-            const jawRotation = toothId > 30 ? mandibulaRt.quaternion : maxillaRt.quaternion;
+            // const jawTranslation = toothId > 30 ? mandibulaRt.translation : maxillaRt.translation;
+            // const jawRotation = toothId > 30 ? mandibulaRt.quaternion : maxillaRt.quaternion;
             const localTranslation = transforms.translation;
             const localRotation = new THREE.Quaternion(
                 transforms.rotation.x,
@@ -185,7 +188,8 @@ export const ToothPlacement = forwardRef((props, ref) => {
                 return newOrthoData;
             });
         }
-    }, [orthoData, stage, mandibulaRt, maxillaRt, setOrthoData]);
+    // }, [orthoData, stage, mandibulaRt, maxillaRt, setOrthoData]);
+    }, [orthoData, stage, setOrthoData]);
 
     // Local state for showMode if not controlled
     const [showMode, setShowMode] = useState(showModeProp);
@@ -223,6 +227,7 @@ export const ToothPlacement = forwardRef((props, ref) => {
                         landmarks={landmarksT1 ? landmarksT1[toothID] : {}}
                         url={`/meshes/${toothID}.stl?ts=${props.meshVersion}`}
                         meshVersion={props.meshVersion}
+                        baseCaseFilename={props.baseCaseFilename}
                         isClicked={toothID === clickedToothId}
                         onToothClick={handleToothClick}
                         useShortRoots={useShortRoots}

@@ -213,16 +213,3 @@ if __name__ == "__main__":
             exportMesh(os.path.join(exportDirShortRoots, clID + '.stl'), tooth.getShortRootData())
             exportMesh(os.path.join(exportDirLongRoots, clID + '.stl'), tooth.getRootData())
             exportMesh(os.path.join(exportDirCrowns, clID + '.stl'), tooth.getCrownData())
-
-    # json_proc = multiprocessing.Process(target=export_json_data, args=("public/orthoData.json", ortho_data))
-    # json_proc.start()
-    # json_proc.join()
-
-    # jobs = []
-    # for exportDir, method_name in surface_types:
-    #     p = multiprocessing.Process(target=export_surface_type, args=(exportDir, method_name))
-    #     jobs.append(p)
-    #     p.start()
-
-    # for p in jobs:
-    #     p.join()
