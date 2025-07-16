@@ -208,7 +208,7 @@ class OrthoInferencePipeline:
         template_mandible_jaw_transform = template_loader.ortho_case.tp.GetJaw(JawType.Mandible).relativeTransform(0)
         template_maxilla_jaw_transform = template_loader.ortho_case.tp.GetJaw(JawType.Maxilla).relativeTransform(0)
 
-        print(f"mandible_jaw_tr {base_mandible_jaw_transform} type {type(base_mandible_jaw_transform)}")
+        # print(f"mandible_jaw_tr {base_mandible_jaw_transform} type {type(base_mandible_jaw_transform)}")
 
         template_input = template_points_t2 - template_points_t1
         # Prepare template input (invert x and y) wich is strange behaviour!!!! check frontend!!!

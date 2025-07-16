@@ -39,8 +39,8 @@ export const ToothPlacement = forwardRef((props, ref) => {
     const jsonMandibularData = orthoData?.mandibularRelativeTransform || null;
     const jsonMaxillaData = orthoData?.maxillaRelativeTransform || null;
     const jsonStagingData = orthoData?.Staging || null;
-    const mandibularOcclusalToJawTransform = orthoData?.mandibularOcclusalToJawTransform || null;
-    const maxillaOcclusalToJawTransform = orthoData?.maxillaOcclusalToJawTransform || null;
+    // const mandibularOcclusalToJawTransform = orthoData?.mandibularOcclusalToJawTransform || null;
+    // const maxillaOcclusalToJawTransform = orthoData?.maxillaOcclusalToJawTransform || null;
     
     const stagesNum = jsonStagingData ? jsonStagingData.length : 0;
     const stagingDataT1 = jsonStagingData && stagesNum > 0 ? jsonStagingData[0] : null;

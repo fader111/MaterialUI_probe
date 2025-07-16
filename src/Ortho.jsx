@@ -73,24 +73,26 @@ export default function Ortho(props) {
   // Initial data fetch 
   useEffect(() => {
     const fetchOrthoData = async() => {
-      const base_case_id = '00000000';
-      try {
-        const response = await fetch("http://localhost:8000/get_case_data/", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({base_case_id})
-        });
-        const data = await response.json();
-        setOrthoData(data);
-      } catch (error) {
-        console.error(error);
+      console.log('INITIAL fetchOrthoData called with baseCaseFilename', props.baseCaseFilename);
+        const base_case_id = props.baseCaseFilename || ''; // Dynamically use the correct base case ID
+        try {
+          const response = await fetch("http://localhost:8000/get_case_data/", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({base_case_id})
+          });
+          const data = await response.json();
+          setOrthoData(data);
+        } catch (error) {
+          console.error(error);
+        }
       }
-    }
-    fetchOrthoData();
-  }, []); // Only run on mount
+      fetchOrthoData();
+  }, [props.baseCaseFilename]); // Re-run if baseCaseFilename changes
 
   // Handler to reload orthoData after file upload/processing
   const handleFileLoaded = useCallback(async (filename) => {
+    console.log('handleFileLoaded!!! called with baseCaseFilename', props.baseCaseFilename);
     try {
       const base_case_id = filename.replace(/\.oas$/i, ''); // Extract base_case_id from filename
       const response = await fetch("http://localhost:8000/get_case_data/", {

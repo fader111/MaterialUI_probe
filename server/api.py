@@ -159,7 +159,7 @@ async def get_case_data(base_case_id: str = Body(..., embed=True)):
     Accepts: { file_path: str }
     """
     base_case_path = os.path.join("server", f"{base_case_id}.oas")
-    print(f"file_path {base_case_path}")
+    # print(f"file_path get_case_data {base_case_path}")
     ortho_case = get_cached_ortho_case(base_case_path)
     ortho_data = OrthoData(ortho_case)
     return ortho_data.ortho_data
@@ -179,6 +179,7 @@ class OrthoData():
             "maxillaRelativeTransform": self.getJawRelativeTransform(JawType.Maxilla),
             "Staging": self.getStagingData()
         }
+        # print(f"self.ortho_data.mandibularRelativeTransform {self.ortho_data['mandibularRelativeTransform']}")
 
     def getPoints(self, point):
         return {
@@ -214,6 +215,9 @@ class OrthoData():
             # из стейджинга понадобятся MandibularTransform, MaxillaryTransform, RelativeToothTransforms, Landmarks
             stage_data = {}
             stage_data["Stage"] = stage_number
+            # stage_data["MandibularTransform"] = self.getJawRelativeTransform(JawType.Mandible)
+            # stage_data["MaxillaryTransform"] = self.getJawRelativeTransform(JawType.Maxilla)
+            # print(f'{stage} stage_data[MandibularTransform] {stage_data["MandibularTransform"]}')
 
             # collect RelativeToothTransforms
             relativeToothTransforms = {}

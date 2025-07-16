@@ -202,8 +202,8 @@ if __name__ == "__main__":
                 os.remove(file_path)
 
     # Save to JSON file
-    with open(f"public/orthoData.json", "w") as json_file:
-        json.dump(ortho_data, json_file, indent=4)
+    # with open(f"public/orthoData.json", "w") as json_file:
+    #     json.dump(ortho_data, json_file, indent=4)
 
     for jawType in JawType:
         jaw = tp.GetJaw(jawType)
