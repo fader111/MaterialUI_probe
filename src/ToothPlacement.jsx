@@ -13,13 +13,10 @@ export const ToothPlacement = forwardRef((props, ref) => {
         stage,
         // onStagingDataUpdate, // Not in the Ortho!! remove?? 
         stagingPatterns, 
-        stagingPatternsTrigger, 
         stagingType = "Case", 
         showMode: showModeProp = 2, // allow controlled showMode
-        onShowModeChange, // callback for parent to control showMode
         useShortRoots = false,
         showLandmarks = true,
-        baseCaseFilename // <-- add this prop
     } = props;
 
     // console.log("ToothPlacement props.meshVersion:", props.meshVersion);
@@ -46,29 +43,29 @@ export const ToothPlacement = forwardRef((props, ref) => {
     const stagingDataT1 = jsonStagingData && stagesNum > 0 ? jsonStagingData[0] : null;
     const stagingDataT2 = jsonStagingData && stagesNum > 0 ? jsonStagingData[stagesNum - 1] : null;
 
+    // Add baseCaseFilename or orthoData.CaseID to dependencies to ensure recalculation on file change
+    const caseKey = orthoData?.CaseID || orthoData?.caseID || orthoData?.id || '';
     const mandibulaRt = useMemo(() => {
         return jsonMandibularData ? rt(jsonMandibularData) : { translation: new THREE.Vector3(), quaternion: new THREE.Quaternion() };
-    }, [jsonMandibularData]);
+    }, [jsonMandibularData, caseKey]); // Removed orthoData from dependencies to avoid unnecessary recalculations
 
     const maxillaRt = useMemo(() => {
         return jsonMaxillaData ? rt(jsonMaxillaData) : { translation: new THREE.Vector3(), quaternion: new THREE.Quaternion() };
-    }, [jsonMaxillaData, orthoData]);
-    // }, []);
+    }, [jsonMaxillaData, caseKey]); // Removed orthoData from dependencies to avoid unnecessary recalculations
 
     const { jsonT1Vec3, jsonT2Vec3, jsonStageVec3 } = useMemo(() => {
-        // console.log("call usememo 59")
         let stageVec3 = {};
         let t1Vec3 = {};
         let t2Vec3 = {};
 
-        if (jsonStagingData && stagesNum > 0) {
+        if (jsonStagingData && stagesNum > 0 && stagingDataT1 && stagingDataT2 && stagingDataT2.RelativeToothTransforms && stagingDataT1.RelativeToothTransforms) {
             for (const toothID in stagingDataT2.RelativeToothTransforms) {
-                const toothRt = rt(jsonStagingData[stage].RelativeToothTransforms[toothID]);
+                const toothRt = rt(jsonStagingData[stage]?.RelativeToothTransforms?.[toothID]);
                 const toothRtT1 = rt(stagingDataT1.RelativeToothTransforms[toothID]);
                 const toothRtT2 = rt(stagingDataT2.RelativeToothTransforms[toothID]);
                 const jawTranstation = toothID > 30 ? mandibulaRt.translation : maxillaRt.translation;
                 const jawRotation = toothID > 30 ? mandibulaRt.quaternion : maxillaRt.quaternion;
-                
+
                 stageVec3[toothID] = {
                     position: toothRt.translation
                         .clone()
@@ -77,7 +74,6 @@ export const ToothPlacement = forwardRef((props, ref) => {
                     quaternion: jawRotation
                         .clone()
                         .multiply(toothRt.quaternion)
-                    // quaternion: toothRt.quaternion
                 };
                 t1Vec3[toothID] = {
                     position: toothRtT1.translation
@@ -100,13 +96,16 @@ export const ToothPlacement = forwardRef((props, ref) => {
             }
         }
         return { jsonT1Vec3: t1Vec3, jsonT2Vec3: t2Vec3, jsonStageVec3: stageVec3 };
-    // }, [jsonStagingData, stage, mandibulaRt, maxillaRt, stagesNum, stagingDataT1, stagingDataT2]);
-    }, [orthoData, stagingDataT1, stagingDataT2, stage]);
-    
+    }, [stagingDataT1, stagingDataT2, stage, mandibulaRt, maxillaRt]); // Removed orthoData to avoid redundant recalculations
+
     // Update landmarks
     useEffect(() => {
-        if (jsonStagingData && stagesNum > 0) {
-            // console.log("TP use effect 55")
+        // Reset landmarks when orthoData changes
+        setLandmarksT1(null);
+    }, [caseKey]); // Changed dependency to caseKey for better granularity
+
+    useEffect(() => {
+        if (jsonStagingData && stagesNum > 0 && stagingDataT1 && stagingDataT1.RelativeToothTransforms && stagingDataT1.Landmarks) {
             const landmarksT1_ = {};
             for (const toothID in stagingDataT1.RelativeToothTransforms) {
                 const toothRt0 = rt(stagingDataT1.RelativeToothTransforms[toothID]);
@@ -115,17 +114,15 @@ export const ToothPlacement = forwardRef((props, ref) => {
                 const position0 = toothRt0.translation.add(jawTranstation1);
                 const quaternion0 = toothRt0.quaternion.multiply(jawRotation);
                 let lmTypes = {};
-                for (const lmType in stagingDataT1.Landmarks[toothID]) {
+                for (const lmType in (stagingDataT1.Landmarks[toothID] || {})) {
                     const lmPoint = toVec3(stagingDataT1.Landmarks[toothID][lmType])
-                        //.sub(position0) //old version used before generating ortho json data locally
-                        //.applyQuaternion(quaternion0.clone().invert());
                     lmTypes[lmType] = lmPoint;
                 }
                 landmarksT1_[toothID] = lmTypes;
             }
             setLandmarksT1(landmarksT1_);
         }
-    }, [jsonStagingData, stagingDataT1, mandibulaRt, maxillaRt, stagesNum]);
+    }, [jsonStagingData, stagingDataT1, mandibulaRt, maxillaRt, stagesNum, orthoData]);
 
     const linearStagingData = useMemo(() => {
         // console.log("call LinearStagingData from UseMemo");

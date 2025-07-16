@@ -159,12 +159,12 @@ async def get_case_data(base_case_id: str = Body(..., embed=True)):
     Accepts: { file_path: str }
     """
     base_case_path = os.path.join("server", f"{base_case_id}.oas")
-    print(f"DEBUG: Received base_case_id: {base_case_id}") # Log base_case_id
-    print(f"DEBUG: Constructed file path: {base_case_path}") # Log file path
+    # print(f"DEBUG: Received base_case_id: {base_case_id}") # Log base_case_id
+    # print(f"DEBUG: Constructed file path: {base_case_path}") # Log file path
     try:
         ortho_case = get_cached_ortho_case(base_case_path)
         ortho_data = OrthoData(ortho_case)
-        print(f"DEBUG: Successfully loaded ortho_data for {base_case_id}") # Log success
+        # print(f"DEBUG: Successfully loaded ortho_data for {base_case_id}") # Log success
         return ortho_data.ortho_data
     except Exception as e:
         print(f"ERROR: Failed to load ortho_data for {base_case_id}: {e}") # Log error
