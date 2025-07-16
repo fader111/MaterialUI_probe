@@ -159,11 +159,16 @@ async def get_case_data(base_case_id: str = Body(..., embed=True)):
     Accepts: { file_path: str }
     """
     base_case_path = os.path.join("server", f"{base_case_id}.oas")
-    # print(f"file_path get_case_data {base_case_path}")
-    ortho_case = get_cached_ortho_case(base_case_path)
-    ortho_data = OrthoData(ortho_case)
-    return ortho_data.ortho_data
-
+    print(f"DEBUG: Received base_case_id: {base_case_id}") # Log base_case_id
+    print(f"DEBUG: Constructed file path: {base_case_path}") # Log file path
+    try:
+        ortho_case = get_cached_ortho_case(base_case_path)
+        ortho_data = OrthoData(ortho_case)
+        print(f"DEBUG: Successfully loaded ortho_data for {base_case_id}") # Log success
+        return ortho_data.ortho_data
+    except Exception as e:
+        print(f"ERROR: Failed to load ortho_data for {base_case_id}: {e}") # Log error
+        raise HTTPException(status_code=500, detail="Failed to load case data")
 
 class OrthoData():
 
@@ -250,4 +255,3 @@ class OrthoData():
             staging_data.append(stage_data)
 
         return staging_data
-        

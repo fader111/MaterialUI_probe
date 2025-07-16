@@ -46,29 +46,22 @@ export const ToothPlacement = forwardRef((props, ref) => {
     const stagingDataT1 = jsonStagingData && stagesNum > 0 ? jsonStagingData[0] : null;
     const stagingDataT2 = jsonStagingData && stagesNum > 0 ? jsonStagingData[stagesNum - 1] : null;
 
-    const mandibulaRt = useMemo(() => { // really need to useMemo here?
+    const mandibulaRt = useMemo(() => {
         return jsonMandibularData ? rt(jsonMandibularData) : { translation: new THREE.Vector3(), quaternion: new THREE.Quaternion() };
     }, [jsonMandibularData]);
 
     const maxillaRt = useMemo(() => {
         return jsonMaxillaData ? rt(jsonMaxillaData) : { translation: new THREE.Vector3(), quaternion: new THREE.Quaternion() };
-    }, [jsonMaxillaData]);
+    }, [jsonMaxillaData, orthoData]);
     // }, []);
 
-    // console.log("mandibulaRt", mandibulaRt, "maxillaRt", maxillaRt);
     const { jsonT1Vec3, jsonT2Vec3, jsonStageVec3 } = useMemo(() => {
-        // console.log("call usememo 25")
+        // console.log("call usememo 59")
         let stageVec3 = {};
         let t1Vec3 = {};
         let t2Vec3 = {};
 
-        // console.log("from toothplace useMemo", " stagesNum", stagesNum, "stage", stage);
-        // console.log("stagingDataT2.RelativeToothTransforms[11]", stagingDataT2.RelativeToothTransforms[11]);
         if (jsonStagingData && stagesNum > 0) {
-            // console.log("mandibularOcclusalToJawTransform", mandibularOcclusalToJawTransform); 
-            // console.log("maxillaOcclusalToJawTransform", maxillaOcclusalToJawTransform);
-            // console.log("mandibulaRt", mandibulaRt);
-            // console.log("maxillaRt", maxillaRt);
             for (const toothID in stagingDataT2.RelativeToothTransforms) {
                 const toothRt = rt(jsonStagingData[stage].RelativeToothTransforms[toothID]);
                 const toothRtT1 = rt(stagingDataT1.RelativeToothTransforms[toothID]);
