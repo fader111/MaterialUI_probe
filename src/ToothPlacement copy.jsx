@@ -55,38 +55,44 @@ export const ToothPlacement = forwardRef((props, ref) => {
         let t2Vec3 = {};
 
         if (caseStagingData && stagesNum > 0 && stagingDataT1 && stagingDataT2 && stagingDataT1.RelativeToothTransformsHead && stagingDataT2.RelativeToothTransformsHead) {
+            // for (const toothID in stagingDataT2.RelativeToothTransforms) {
             for (const toothID in stagingDataT2.RelativeToothTransformsHead) {
-                let toothRt, toothRtT1, toothRtT2;
-                // without try-catch sometimes crashes on rt() call
-                try {
-                    toothRt = rt(caseStagingData[stage]?.RelativeToothTransformsHead?.[toothID]);
-                } catch (e) {
-                    console.error('Error in rt() for stage tooth', {toothID, stage, data: caseStagingData[stage]?.RelativeToothTransformsHead?.[toothID], error: e});
-                    continue;
-                }
-                try {
-                    toothRtT1 = rt(stagingDataT1.RelativeToothTransformsHead[toothID]);
-                } catch (e) {
-                    console.error('Error in rt() for T1 tooth', {toothID, data: stagingDataT1.RelativeToothTransformsHead[toothID], error: e});
-                    continue;
-                }
-                try {
-                    toothRtT2 = rt(stagingDataT2.RelativeToothTransformsHead[toothID]);
-                } catch (e) {
-                    console.error('Error in rt() for T2 tooth', {toothID, data: stagingDataT2.RelativeToothTransformsHead[toothID], error: e});
-                    continue;
-                }
+                const toothRt = rt(caseStagingData[stage]?.RelativeToothTransformsHead?.[toothID]);
+                // const toothRt = rt(caseStagingData[stage]?.RelativeToothTransforms?.[toothID]);
+                const toothRtT1 = rt(stagingDataT1.RelativeToothTransformsHead[toothID]);
+                const toothRtT2 = rt(stagingDataT2.RelativeToothTransformsHead[toothID]);
+                // const jawTranstation = toothID > 30 ? mandibulaRt.translation : maxillaRt.translation;
+                // const jawRotation = toothID > 30 ? mandibulaRt.quaternion : maxillaRt.quaternion;
+
                 stageVec3[toothID] = {
                     position: toothRt.translation,
-                    quaternion: toothRt.quaternion
+                        // .clone()
+                        // .applyQuaternion(jawRotation)
+                        // .add(jawTranstation),
+                    // quaternion: jawRotation
+                        // .clone()
+                        // .multiply(toothRt.quaternion)
+                    quaternion : toothRt.quaternion
                 };
                 t1Vec3[toothID] = {
                     position: toothRtT1.translation,
-                    quaternion: toothRtT1.quaternion
+                        // .clone()
+                        // .applyQuaternion(jawRotation)
+                        // .add(jawTranstation),
+                    // quaternion: jawRotation
+                        // .clone()
+                        // .multiply(toothRtT1.quaternion)
+                    quaternion : toothRtT1.quaternion
                 };
                 t2Vec3[toothID] = {
                     position: toothRtT2.translation,
-                    quaternion: toothRtT2.quaternion
+                        // .clone()
+                        // .applyQuaternion(jawRotation)
+                        // .add(jawTranstation),
+                    // quaternion: jawRotation
+                        // .clone()
+                        // .multiply(toothRtT2.quaternion)
+                    quaternion : toothRtT2.quaternion
                 };
             }
         }
