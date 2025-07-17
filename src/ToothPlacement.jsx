@@ -18,7 +18,7 @@ export const ToothPlacement = forwardRef((props, ref) => {
         useShortRoots = false,
         showLandmarks = true,
     } = props;
-
+    
     // console.log("ToothPlacement props.meshVersion:", props.meshVersion);
     const [landmarksT1, setLandmarksT1] = useState(null);
     const [clickedToothId, setClickedToothId] = useState(null);
@@ -43,39 +43,18 @@ export const ToothPlacement = forwardRef((props, ref) => {
     const stagingDataT1 = caseStagingData && stagesNum > 0 ? caseStagingData[0] : null;
     const stagingDataT2 = caseStagingData && stagesNum > 0 ? caseStagingData[stagesNum - 1] : null;
 
-    // Guard: don't render until all required data is loaded
-    if (!caseStagingData || !stagingDataT1 || !stagingDataT2 || !stagingDataT1.RelativeToothTransformsHead['11'].translation) {
-        return null;
-    }
-    // console.log("stagingDataT1.RelativeToothTransformsHead 11 translation:", stagingDataT1.RelativeToothTransformsHead['11'].translation);
-    
     const { jsonT1Vec3, jsonT2Vec3, jsonStageVec3 } = useMemo(() => {
         let stageVec3 = {};
         let t1Vec3 = {};
         let t2Vec3 = {};
 
-        if (caseStagingData && stagesNum > 0 && stagingDataT1 && stagingDataT2 && stagingDataT1.RelativeToothTransformsHead && stagingDataT2.RelativeToothTransformsHead) {
+        if (caseStagingData && stagesNum > 0) {
             for (const toothID in stagingDataT2.RelativeToothTransformsHead) {
-                let toothRt, toothRtT1, toothRtT2;
-                // without try-catch sometimes crashes on rt() call
-                try {
-                    toothRt = rt(caseStagingData[stage]?.RelativeToothTransformsHead?.[toothID]);
-                } catch (e) {
-                    console.error('Error in rt() for stage tooth', {toothID, stage, data: caseStagingData[stage]?.RelativeToothTransformsHead?.[toothID], error: e});
-                    continue;
-                }
-                try {
-                    toothRtT1 = rt(stagingDataT1.RelativeToothTransformsHead[toothID]);
-                } catch (e) {
-                    console.error('Error in rt() for T1 tooth', {toothID, data: stagingDataT1.RelativeToothTransformsHead[toothID], error: e});
-                    continue;
-                }
-                try {
-                    toothRtT2 = rt(stagingDataT2.RelativeToothTransformsHead[toothID]);
-                } catch (e) {
-                    console.error('Error in rt() for T2 tooth', {toothID, data: stagingDataT2.RelativeToothTransformsHead[toothID], error: e});
-                    continue;
-                }
+
+                const toothRt = rt(caseStagingData[stage]?.RelativeToothTransformsHead?.[toothID]);
+                const toothRtT1 = rt(stagingDataT1.RelativeToothTransformsHead[toothID]);
+                const toothRtT2 = rt(stagingDataT2.RelativeToothTransformsHead[toothID]);
+
                 stageVec3[toothID] = {
                     position: toothRt.translation,
                     quaternion: toothRt.quaternion
@@ -91,24 +70,13 @@ export const ToothPlacement = forwardRef((props, ref) => {
             }
         }
         return { jsonT1Vec3: t1Vec3, jsonT2Vec3: t2Vec3, jsonStageVec3: stageVec3 };
-    // }, [stagingDataT1, stagingDataT2, stage, mandibulaRt, maxillaRt]); // Removed orthoData to avoid redundant recalculations
     }, [caseStagingData, stagingDataT1, stage]);
-
-    // Update landmarks
-    // useEffect(() => {
-    //     // Reset landmarks when orthoData changes
-    //     setLandmarksT1(null);
-    // }, [caseKey]); // Changed dependency to caseKey for better granularity
 
     useEffect(() => {
         if (caseStagingData && stagesNum > 0 ) {
             const landmarksT1_ = {};
             for (const toothID in stagingDataT1.RelativeToothTransformsHead) {
-                // const toothRt0 = rt(stagingDataT1.RelativeToothTransformsHead[toothID]);
-                // const jawTranstation1 = toothID > 30 ? mandibulaRt.translation : maxillaRt.translation;
-                // const jawRotation = toothID > 30 ? mandibulaRt.quaternion : maxillaRt.quaternion;
-                // const position0 = toothRt0.translation.add(jawTranstation1);
-                // const quaternion0 = toothRt0.quaternion.multiply(jawRotation);
+                
                 let lmTypes = {};
                 for (const lmType in (stagingDataT1.Landmarks[toothID] || {})) {
                     const lmPoint = toVec3(stagingDataT1.Landmarks[toothID][lmType])
@@ -146,13 +114,9 @@ export const ToothPlacement = forwardRef((props, ref) => {
 
     let stagingData = stagingDataSelector[stagingType] || {};
 
-    // Add state to trigger rerender with new T2 prediction
-    // const [rerenderStageData, setRerenderStagingData] = useState(null);
-
-    const handleToothTransform = useCallback((toothId, transforms) => {
+    // handke 
+    const handleToothTransformControl = useCallback((toothId, transforms) => {
         if (orthoData?.Staging && orthoData.Staging[stage]) {
-            // const jawTranslation = toothId > 30 ? mandibulaRt.translation : maxillaRt.translation;
-            // const jawRotation = toothId > 30 ? mandibulaRt.quaternion : maxillaRt.quaternion;
             const localTranslation = transforms.translation;
             const localRotation = new THREE.Quaternion(
                 transforms.rotation.x,
@@ -172,9 +136,9 @@ export const ToothPlacement = forwardRef((props, ref) => {
             setOrthoData(prev => {
                 if (!prev || !prev.Staging) return prev;
                 const newOrthoData = { ...prev, Staging: [...prev.Staging] };
-                const newStage = { ...newOrthoData.Staging[stage], RelativeToothTransforms: { ...newOrthoData.Staging[stage].RelativeToothTransforms } };
-                newStage.RelativeToothTransforms[toothId] = {
-                    ...newStage.RelativeToothTransforms[toothId],
+                const newStage = { ...newOrthoData.Staging[stage], RelativeToothTransformsHead: { ...newOrthoData.Staging[stage].RelativeToothTransformsHead } };
+                newStage.RelativeToothTransformsHead[toothId] = {
+                    ...newStage.RelativeToothTransformsHead[toothId],
                     translation: localTransforms.translation,
                     rotation: localTransforms.rotation
                 };
@@ -213,7 +177,7 @@ export const ToothPlacement = forwardRef((props, ref) => {
                     <Tooth
                         key={toothID}
                         toothID={toothID}
-                        onTransform={handleToothTransform}
+                        onTransform={handleToothTransformControl}
                         trackballControlsRef={trackballControlsRef}
                         setControlsEnabled={setControlsEnabled}
                         stage={stage}

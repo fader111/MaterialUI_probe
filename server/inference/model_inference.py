@@ -8,7 +8,7 @@ import torch
 from typing import List, Dict, Any
 # from server.inference.models import ArchFormRegressor, InitAutoencoder
 from autosetup_ml.utils import *
-import torch
+from server.ortho_data import getToothRelativeTransform, getToothRelativeTransformHead
 import torch.nn as nn
 import json
 import contextlib
@@ -158,33 +158,33 @@ class OrthoInferencePipeline:
         self.ae = AutoencoderInference(ae_ckpt)
         self.reg = ArchRegressorInference(reg_ckpt) if reg_ckpt else None
 
-    @staticmethod
-    def _get_tooth_relative_transform(tooth, stage):
-        try:
-            rel_transform = tooth.relativeTransform(stage)
-            if rel_transform is None:
-                print(f"[ERROR] Null pointer: relativeTransform({stage}) is None for tooth {getattr(tooth, 'cl_id', 'unknown')}")
-                return None
-            translation = rel_transform.translation
-            rotation = rel_transform.rotation
-            return {
-                "translation": {
-                    "x": translation.x, "y": translation.y, "z": translation.z},
-                "rotation": {
-                    "x": rotation.im.x, "y": rotation.im.y, "z": rotation.im.z,
-                    "w": rotation.re}
-            }
-        except Exception as e:
-            print(f"[ERROR] Exception in getToothRelativeTransform for tooth {getattr(tooth, 'cl_id', 'unknown')}: {e}")
-            return None
+    # @staticmethod
+    # def _get_tooth_relative_transform(tooth, stage):
+    #     try:
+    #         rel_transform = tooth.relativeTransform(stage)
+    #         if rel_transform is None:
+    #             print(f"[ERROR] Null pointer: relativeTransform({stage}) is None for tooth {getattr(tooth, 'cl_id', 'unknown')}")
+    #             return None
+    #         translation = rel_transform.translation
+    #         rotation = rel_transform.rotation
+    #         return {
+    #             "translation": {
+    #                 "x": translation.x, "y": translation.y, "z": translation.z},
+    #             "rotation": {
+    #                 "x": rotation.im.x, "y": rotation.im.y, "z": rotation.im.z,
+    #                 "w": rotation.re}
+    #         }
+    #     except Exception as e:
+    #         print(f"[ERROR] Exception in getToothRelativeTransform for tooth {getattr(tooth, 'cl_id', 'unknown')}: {e}")
+    #         return None
 
-    def _compose_transforms(self, base_loader, predictions, base_case_points_t1):
+    def _compose_transforms_from_points(self, base_loader: OrthoCaseLoader, prediction_points, base_case_points_t1) -> Dict[str, Dict[str, Any]]:
         transforms_dict = {}
         for tooth_idx, tooth_id in enumerate(dw_teeth_nums14 + up_teeth_nums14):
             tooth_points_t1 = base_case_points_t1[tooth_idx]
-            tooth_points_pred = predictions[tooth_idx]
+            tooth_points_pred = prediction_points[tooth_idx]
             tooth = base_loader.get_tooth_by_cl_id(tooth_id)
-            toothRT0 = self._get_tooth_relative_transform(tooth, 0)
+            toothRT0 = getToothRelativeTransform(tooth, stage=0)
             if toothRT0 is None:
                 print(f"[ERROR] Skipping tooth {tooth_id} not presented.")
                 continue
@@ -194,8 +194,50 @@ class OrthoInferencePipeline:
             tooth_transform = get_transform_from_matrix(total_matrix)
             transforms_dict[str(tooth_id)] = tooth_transform
         return transforms_dict
+    
+    def _compose_transforms_to_jaw(self, transforms_dict: Dict[str, Dict[str, Any]], mandible_rt, maxillary_rt) -> Dict[str, Dict[str, Any]]:
+        
+        mandible_jaw_translation = translate_from_ormco(mandible_rt)
+        mandible_jaw_quaternion = quaternion_from_ormco(mandible_rt)
+        maxilla_jaw_translation = translate_from_ormco(maxillary_rt)
+        maxilla_jaw_quaternion = quaternion_from_ormco(maxillary_rt)
 
-    def run_t2_predict(self, base_case_path, template_case_path):
+        for tooth_id, tf in transforms_dict.items():
+            try:
+                tid = int(tooth_id)
+            except Exception:
+                continue
+            if tid < 30: # TODO рефакторить используя isLower 
+                # upper jaw
+                jaw_translation = maxilla_jaw_translation
+                jaw_quaternion = maxilla_jaw_quaternion
+            else:
+                # lower jaw
+                jaw_translation = mandible_jaw_translation
+                jaw_quaternion = mandible_jaw_quaternion
+            # Apply jaw rotation to tooth translation
+            t_vec = np.array([tf["translation"]["x"], tf["translation"]["y"], tf["translation"]["z"]])
+            q_quat = [tf["rotation"]["x"], tf["rotation"]["y"], tf["rotation"]["z"], tf["rotation"]["w"]]
+            jt_vec = np.array([jaw_translation[0], jaw_translation[1], jaw_translation[2]])
+            jq_quat = [jaw_quaternion[0], jaw_quaternion[1], jaw_quaternion[2], jaw_quaternion[3]]
+            t_rot = R.from_quat(jq_quat).apply(t_vec)
+            final_translation = t_rot + jt_vec
+            final_quat = R.from_quat(jq_quat) * R.from_quat(q_quat)
+            final_quat_xyzw = final_quat.as_quat()
+            tf["translation"] = {
+                "x": float(final_translation[0]),
+                "y": float(final_translation[1]),
+                "z": float(final_translation[2])
+            }
+            tf["rotation"] = {
+                "x": float(final_quat_xyzw[0]),
+                "y": float(final_quat_xyzw[1]),
+                "z": float(final_quat_xyzw[2]),
+                "w": float(final_quat_xyzw[3])
+            }
+        return transforms_dict
+
+    def run_t2_predict(self, base_case_path, template_case_path) -> Dict[str, Dict[str, Any]]:
         base_loader = OrthoCaseLoader(base_case_path)
         template_loader = OrthoCaseLoader(template_case_path)
         base_case_points_t1, base_case_points_t2 = base_loader.get_landmarks()
@@ -216,20 +258,32 @@ class OrthoInferencePipeline:
         # template_input[..., 0] *= -1
         # template_input[..., 1] *= -1
         # AE prediction
-        init_predictions, _ = self.ae.predict(base_case_points_t1, base_case_points_t2)
+        init_prediction_points, _ = self.ae.predict(base_case_points_t1, base_case_points_t2)
         # Regressor prediction
-        predictions, _ = self.reg.predict(init_predictions, template_input, template_points_t2) if self.reg else (init_predictions, 0)
+        predictions, _ = self.reg.predict(init_prediction_points, template_input, template_points_t2) if self.reg else (init_prediction_points, 0)
         # Compose transforms
-        transforms_dict = self._compose_transforms(base_loader, predictions, base_case_points_t1)
+        transforms_dict = self._compose_transforms_from_points(base_loader, predictions, base_case_points_t1)
+
+        base_mandible_jaw_rt = base_loader.ortho_case.tp.GetJaw(JawType.Mandible).relativeTransform(0)
+        base_maxilla_jaw_rt = base_loader.ortho_case.tp.GetJaw(JawType.Maxilla).relativeTransform(0)
+
+        # transform to Head coordinates
+        transforms_dict = self._compose_transforms_to_jaw(transforms_dict, base_mandible_jaw_rt, base_maxilla_jaw_rt)
+
         print(f"T2 inference done (class pipeline)")
         return transforms_dict
 
-    def run_init_predict(self, base_case_path):
+    def run_init_predict(self, base_case_path) -> Dict[str, Dict[str, Any]]:
         base_loader = OrthoCaseLoader(base_case_path)
         base_case_points_t1, base_case_points_t2 = base_loader.get_landmarks()
-        init_predictions, loss = self.ae.predict(base_case_points_t1, base_case_points_t2)
-        # Compose transforms (same as in run, but using AE predictions only)
-        transforms_dict = self._compose_transforms(base_loader, init_predictions, base_case_points_t1)
+        init_prediction_points, loss = self.ae.predict(base_case_points_t1, base_case_points_t2)
+
+        transforms_dict = self._compose_transforms_from_points(base_loader, init_prediction_points, base_case_points_t1)
+        base_mandible_jaw_rt = base_loader.ortho_case.tp.GetJaw(JawType.Mandible).relativeTransform(0)
+        base_maxilla_jaw_rt = base_loader.ortho_case.tp.GetJaw(JawType.Maxilla).relativeTransform(0)
+
+        # transform to Head coordinates
+        transforms_dict = self._compose_transforms_to_jaw(transforms_dict, base_mandible_jaw_rt, base_maxilla_jaw_rt)
         print(f"Init inference done (class pipeline)")
         return transforms_dict
 

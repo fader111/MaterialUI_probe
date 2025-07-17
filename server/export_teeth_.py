@@ -155,18 +155,18 @@ def getTeethBoltonData():
     return tooth_data
 
 # Create final ortho_data structure
-ortho_data = {
-    "CaseID": str(caseID),
-    "T2Stage": str(t2),
-    "mandibularRelativeTransform": getJawRelativeTransform(JawType.Mandible),
-    "maxillaRelativeTransform": getJawRelativeTransform(JawType.Maxilla),
-    "mandibularOcclusalToJawTransform": getOcclusalToJawTransform(JawType.Mandible),
-    "maxillaOcclusalToJawTransform": getOcclusalToJawTransform(JawType.Maxilla),
-    "mandibularOcclussalCS": getOcclusalCSdata(mandibularOcclussalCS),
-    "maxillaOcclussalCS": getOcclusalCSdata(maxillaOcclussalCS),
-    "Bolton": getTeethBoltonData(),
-    "Staging": getStagingData()
-}
+ortho_data = {}
+#     "CaseID": str(caseID),
+#     "T2Stage": str(t2),
+#     "mandibularRelativeTransform": getJawRelativeTransform(JawType.Mandible),
+#     "maxillaRelativeTransform": getJawRelativeTransform(JawType.Maxilla),
+#     "mandibularOcclusalToJawTransform": getOcclusalToJawTransform(JawType.Mandible),
+#     "maxillaOcclusalToJawTransform": getOcclusalToJawTransform(JawType.Maxilla),
+#     "mandibularOcclussalCS": getOcclusalCSdata(mandibularOcclussalCS),
+#     "maxillaOcclussalCS": getOcclusalCSdata(maxillaOcclussalCS),
+#     "Bolton": getTeethBoltonData(),
+#     "Staging": getStagingData()
+# }
 
 def export_surface_type(exportDir, method_name):
     """for multiprocessing not implemented because of mp restrictions """

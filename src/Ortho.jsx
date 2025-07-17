@@ -30,7 +30,14 @@ function CameraFollowingLight({ camera }) {
 
 
 export default function Ortho(props) {
+  const { orthoData, setOrthoData, isFileLoaded, loading, onFileLoaded, baseCaseFilename } = props;
   const [stage, setStage] = useState(0);
+
+  // Reset stage to 0 when a new case with lower stage amount is loaded (baseCaseFilename changes)
+  useEffect(() => {
+    setStage(0);
+  }, [baseCaseFilename]);
+  
   let [T2Stage, setT2Stage] = useState(0);
   const [camera, setCamera] = useState(null)
   const controlsRef = useRef(null);
@@ -42,8 +49,7 @@ export default function Ortho(props) {
   const [shortRoots, setShortRoots] = useState(true);
   const [showLandmarks, setShowLandmarks] = useState(false);
 
-  // Use orthoData, setOrthoData, isFileLoaded, loading, baseCaseFilename from props
-  const { orthoData, setOrthoData, isFileLoaded, loading, onFileLoaded, baseCaseFilename } = props;
+  // Use orthoData, setOrthoData, isFileLoaded, loading, baseCaseFilename from props?
 
   // Handle T2Stage updates
   useEffect(() => {
@@ -111,6 +117,7 @@ export default function Ortho(props) {
   
   // Handler for T2 prediction (refactored to update orthoData.Staging)
   const handlePredictT2 = useCallback(async () => {
+    console.log("handlePredictT2 called");
     try {
       const base_case_id = baseCaseFilename || '00000000';
       const template_case_id = '120076_1'; // TODO: make dynamic if needed
@@ -126,12 +133,12 @@ export default function Ortho(props) {
       setOrthoData(prev => {
         if (!prev || !prev.Staging) return prev;
         const newOrthoData = { ...prev, Staging: [...prev.Staging] };
-        const stageIdx = newOrthoData.Staging.length - 1;
-        const newStage = { ...newOrthoData.Staging[stageIdx], RelativeToothTransforms: { ...newOrthoData.Staging[stageIdx].RelativeToothTransforms } };
+        const stageT2Idx = newOrthoData.Staging.length - 1;
+        const newStage = { ...newOrthoData.Staging[stageT2Idx], RelativeToothTransformsHead: { ...newOrthoData.Staging[stageT2Idx].RelativeToothTransformsHead } };
         for (const toothID in prediction) {
-          newStage.RelativeToothTransforms[toothID] = prediction[toothID];
+          newStage.RelativeToothTransformsHead[toothID] = prediction[toothID];
         }
-        newOrthoData.Staging[stageIdx] = newStage;
+        newOrthoData.Staging[stageT2Idx] = newStage;
         return newOrthoData;
       });
     } catch (err) {
@@ -141,7 +148,9 @@ export default function Ortho(props) {
 
   // Handler for Init Predict (now updates orthoData.Staging like handlePredictT2)
   const handlePredictInit = useCallback(async () => {
+    console.log("handlePredictInit called");
     if (!baseCaseFilename) {
+      console.error('handlePredictInit called without baseCaseFilename!');
       return;
     }
     try {
@@ -155,12 +164,12 @@ export default function Ortho(props) {
       setOrthoData(prev => {
         if (!prev || !prev.Staging) return prev;
         const newOrthoData = { ...prev, Staging: [...prev.Staging] };
-        const stageIdx = newOrthoData.Staging.length - 1;
-        const newStage = { ...newOrthoData.Staging[stageIdx], RelativeToothTransforms: { ...newOrthoData.Staging[stageIdx].RelativeToothTransforms } };
+        const stageT2Idx = newOrthoData.Staging.length - 1;
+        const newStage = { ...newOrthoData.Staging[stageT2Idx], RelativeToothTransformsHead: { ...newOrthoData.Staging[stageT2Idx].RelativeToothTransformsHead } };
         for (const toothID in prediction) {
-          newStage.RelativeToothTransforms[toothID] = prediction[toothID];
+          newStage.RelativeToothTransformsHead[toothID] = prediction[toothID];
         }
-        newOrthoData.Staging[stageIdx] = newStage;
+        newOrthoData.Staging[stageT2Idx] = newStage;
         return newOrthoData;
       });
     } catch (err) {
