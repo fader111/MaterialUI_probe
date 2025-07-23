@@ -12,29 +12,48 @@ export function Tooth(props) {
   const [hovered, hover] = useState(false);
   const toothRef = useRef(); 
 
-  // Fallback error state for STL loading
-  // const [loadError, setLoadError] = useState(false);
+  // Robust STL loading with error handling
+  const [crown, setCrown] = useState(null);
+  const [root, setRoot] = useState(null);
+  const [loadError, setLoadError] = useState(false);
+  const [texture, setTexture] = useState(null);
 
   // STL loading 
   const caseId = props.baseCaseFilename || props.meshVersion;
-  const crown = useLoader(
-    STLLoader,
-    `/crowns/${toothID}.stl?case=${caseId}`,
-    loader => `${toothID}-crown-${caseId}`
-  );
-  const root = useLoader(
-    STLLoader,
-    useShortRoots
-      ? `/shortRoots/${toothID}.stl?case=${caseId}`
-      : `/roots/${toothID}.stl?case=${caseId}`,
-    loader => `${toothID}-root-${caseId}`
-  );
-  const texture = useLoader(TextureLoader, `/textures/teeth.png`);
+  useEffect(() => {
+    let isMounted = true;
+    setLoadError(false);
+    // Load crown STL
+    new STLLoader().load(
+      `/crowns/${toothID}.stl?case=${caseId}`,
+      geometry => { if (isMounted) setCrown(geometry); },
+      undefined,
+      err => { if (isMounted) setLoadError(true); }
+    );
+    // Load root STL
+    new STLLoader().load(
+      useShortRoots
+        ? `/shortRoots/${toothID}.stl?case=${caseId}`
+        : `/roots/${toothID}.stl?case=${caseId}`,
+      geometry => { if (isMounted) setRoot(geometry); },
+      undefined,
+      err => { if (isMounted) setLoadError(true); }
+    );
+    // Load texture
+    new TextureLoader().load(
+      `/textures/teeth.png`,
+      tex => { if (isMounted) setTexture(tex); },
+      undefined,
+      err => { if (isMounted) setTexture(null); }
+    );
+    return () => { isMounted = false; };
+  }, [toothID, caseId, useShortRoots]);
 
   const position = stagingData.position;
   const quaternion = stagingData.quaternion;
 
   const combinedGeometries = useMemo(() => {
+    if (!crown || !root) return { crownGeometry: null, rootGeometry: null };
     const crownGeometry = new THREE.BufferGeometry();
     const rootGeometry = new THREE.BufferGeometry();
     crownGeometry.setAttribute('position', new THREE.BufferAttribute(crown.attributes.position.array, 3));
@@ -44,8 +63,12 @@ export function Tooth(props) {
     return { crownGeometry, rootGeometry };
   }, [crown, root]);
 
-  const crownMaterial = new THREE.MeshStandardMaterial({
+  const crownMaterial = texture ? new THREE.MeshStandardMaterial({
     map: texture,
+    color: getColor({ clicked: isClicked, hovered }),
+    transparent: true,
+    opacity: 1.0
+  }) : new THREE.MeshStandardMaterial({
     color: getColor({ clicked: isClicked, hovered }),
     transparent: true,
     opacity: 1.0
@@ -77,11 +100,15 @@ export function Tooth(props) {
   const [meshCenter, setMeshCenter] = useState(new THREE.Vector3());
 
   useEffect(() => {
-    if (combinedGeometries) {
+    if (combinedGeometries && combinedGeometries.crownGeometry) {
       const center = new THREE.Vector3();
-      combinedGeometries.crownGeometry.computeBoundingBox();
-      combinedGeometries.crownGeometry.boundingBox.getCenter(center);
-      setMeshCenter(center);
+      if (combinedGeometries.crownGeometry.computeBoundingBox) {
+        combinedGeometries.crownGeometry.computeBoundingBox();
+        if (combinedGeometries.crownGeometry.boundingBox) {
+          combinedGeometries.crownGeometry.boundingBox.getCenter(center);
+          setMeshCenter(center);
+        }
+      }
     }
   }, [combinedGeometries]);
 
@@ -97,9 +124,21 @@ export function Tooth(props) {
     return <line geometry={lineGeometry} material={lineMaterial} />;
   };
 
+  // Log missing tooth info to console
+  useEffect(() => {
+    if (loadError) {
+      console.warn(`Missing STL for tooth ${toothID}`);
+    }
+  }, [loadError, toothID]);
+
   // render meshContent 
-  const meshContent = (
-    // toothID == '11' ? console.log("rendering meshContent for tooth", toothID, "with position:", position, "and quaternion:", quaternion):null,
+  const meshContent = loadError ? (
+    <group ref={toothRef} position={position} quaternion={quaternion}>
+      {/* <Html style={{ color: 'red', background: 'rgba(255,0,0,0.1)', padding: '4px', borderRadius: '4px' }}>
+        Missing STL for tooth {toothID}
+      </Html> */}
+    </group>
+  ) : (
     <group
       ref={toothRef}
       position={position}
@@ -113,8 +152,8 @@ export function Tooth(props) {
       onPointerOver={(event) => (event.stopPropagation(), hover(true))}
       onPointerOut={() => hover(false)}
     >
-      <mesh geometry={combinedGeometries.crownGeometry} material={crownMaterial} />
-      <mesh geometry={combinedGeometries.rootGeometry} material={rootMaterial} />
+      {combinedGeometries.crownGeometry && <mesh geometry={combinedGeometries.crownGeometry} material={crownMaterial} />}
+      {combinedGeometries.rootGeometry && <mesh geometry={combinedGeometries.rootGeometry} material={rootMaterial} />}
       {showLandmarks && (
         <>
           <LandMark lmType="BCPoint" color="darkorange" />
@@ -129,7 +168,8 @@ export function Tooth(props) {
         />
       )}
     </group>
-  );
+  )
+  ;
 
   const [isDragging, setIsDragging] = useState(false);
   const [initialTransform, setInitialTransform] = useState(null);
