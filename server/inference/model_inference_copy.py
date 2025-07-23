@@ -293,25 +293,53 @@ class OrthoInferencePipeline:
         base_maxilla_jaw_rt = base_loader.ortho_case.tp.GetJaw(JawType.Maxilla).relativeTransform(0)
         template_mandible_jaw_rt = template_loader.ortho_case.tp.GetJaw(JawType.Mandible).relativeTransform(0)
         template_maxilla_jaw_rt = template_loader.ortho_case.tp.GetJaw(JawType.Maxilla).relativeTransform(0)
-
-        base_case_points_t1_ = base_case_points_t1.copy() # orig points for compose transforms
-        base_case_points_t1 = self.point_cloud_to_jaw(base_case_points_t1, base_mandible_jaw_rt, base_maxilla_jaw_rt)
-        base_case_points_t2 = self.point_cloud_to_jaw(base_case_points_t2, base_mandible_jaw_rt, base_maxilla_jaw_rt)
-
-        template_points_t1 = self.point_cloud_to_jaw(template_points_t1, template_mandible_jaw_rt, template_maxilla_jaw_rt)
-        template_points_t2 = self.point_cloud_to_jaw(template_points_t2, template_mandible_jaw_rt, template_maxilla_jaw_rt)
+        if 1:
+            # show_points_in_pv(base_case_points_t1, title="Base Case Points T1 before trans")
+            base_case_points_t1_ = base_case_points_t1.copy() # orig points for compose transforms
+            base_case_points_t1 = self.point_cloud_to_jaw(base_case_points_t1, base_mandible_jaw_rt, base_maxilla_jaw_rt)
+            # show_points_in_pv(base_case_points_t1, title="Base Case Points T1")
+            base_case_points_t2 = self.point_cloud_to_jaw(base_case_points_t2, base_mandible_jaw_rt, base_maxilla_jaw_rt)
+            # show_points_in_pv(base_case_points_t2, title="Base Case Points T2")
+            
+            
+            template_points_t1 = self.point_cloud_to_jaw(template_points_t1, template_mandible_jaw_rt, template_maxilla_jaw_rt)
+            # template_points_t1 = self.point_cloud_to_jaw(template_points_t1, base_mandible_jaw_rt, base_maxilla_jaw_rt)
+            # show_points_in_pv(template_points_t1, title="Template Points T1")
+            
+            template_points_t2 = self.point_cloud_to_jaw(template_points_t2, template_mandible_jaw_rt, template_maxilla_jaw_rt)
+            # template_points_t2 = self.point_cloud_to_jaw(template_points_t2, base_mandible_jaw_rt, base_maxilla_jaw_rt)
+            # show_points_in_pv(template_points_t2, title="Template Points T2")
 
         template_diff = template_points_t2 - template_points_t1
-
+        # Prepare template input (invert x and y) wich is strange behaviour!!!! check frontend!!!
+        if 0:
+            template_diff = template_diff.copy()
+            template_diff[..., 0] *= -1
+            template_diff[..., 1] *= -1
+        # AE prediction
         init_prediction_points, _ = self.ae.predict(base_case_points_t1, base_case_points_t2)
         
-        predictions, _ = self.reg.predict(init_prediction_points, template_diff, template_points_t2) if self.reg else (init_prediction_points, 0)
-        # show_2_cloud_points_in_pv(predictions, template_points_t2, title="Regressor Predictions (red) and Template T2 (blue)")
+        # сдвигает на темплейт jaw
+        # init_prediction_points = self.point_cloud_to_jaw(init_prediction_points, base_mandible_jaw_rt, base_maxilla_jaw_rt)
+        
+        # show_points_in_pv(init_prediction_points, title="Init Prediction Points")
+        # Regressor prediction
+        predictions, _ = self.reg.predict(init_prediction_points, template_diff, base_case_points_t2) if self.reg else (init_prediction_points, 0)
+
+        # predictions = self.point_cloud_to_jaw(predictions, base_mandible_jaw_rt, base_maxilla_jaw_rt)
+        
+        show_2_cloud_points_in_pv(predictions, init_prediction_points, title="Regressor Predictions (red) and Init (blue)")
+        show_2_cloud_points_in_pv(predictions, template_points_t2, title="Regressor Predictions (red) and Template T2 (blue)")
+        # show_2_cloud_points_in_pv(predictions, title="Regressor (red) Predictions")
         # Compose transforms
-        transforms_dict = self._compose_transforms_from_points(base_loader, predictions, base_case_points_t1_) 
+        transforms_dict = self._compose_transforms_from_points(base_loader, predictions, base_case_points_t1_)
+        # transforms_dict = self._compose_transforms_from_points(base_loader, predictions, init_prediction_points)
+
 
         # transform to Head coordinates
         # transforms_dict = self._compose_transforms_to_jaw(transforms_dict, base_mandible_jaw_rt, base_maxilla_jaw_rt)
+        # # transforms_dict = self._compose_transforms_to_jaw(transforms_dict, template_mandible_jaw_rt, template_maxilla_jaw_rt)
+
         print(f"T2 inference done (class pipeline)")
         return transforms_dict
 
@@ -323,10 +351,13 @@ class OrthoInferencePipeline:
         base_case_points_t1, base_case_points_t2 = base_loader.get_landmarks()
         init_prediction_points, loss = self.ae.predict(base_case_points_t1, base_case_points_t2)
 
+        init_prediction_points = self.point_cloud_to_jaw(init_prediction_points, base_mandible_jaw_rt, base_maxilla_jaw_rt)
+
         transforms_dict = self._compose_transforms_from_points(base_loader, init_prediction_points, base_case_points_t1)
+        # show_2_cloud_points_in_pv(init_prediction_points, base_case_points_t1, title="Init Predictions (red) and T1 (blue)")
 
         # transform to Head coordinates
-        transforms_dict = self._compose_transforms_to_jaw(transforms_dict, base_mandible_jaw_rt, base_maxilla_jaw_rt)
+        # transforms_dict = self._compose_transforms_to_jaw(transforms_dict, base_mandible_jaw_rt, base_maxilla_jaw_rt)
         print(f"Init inference done (class pipeline)")
         return transforms_dict
 

@@ -4,15 +4,25 @@ from typing import List, Dict, Any
 from backend.ormco import JawType, LandmarkID
 
 def getToothRelativeTransform(tooth, stage):
-    translation = tooth.relativeTransform(stage).translation
-    rotation = tooth.relativeTransform(stage).rotation
-    return {
-        "translation": {
-            "x": translation.x, "y": translation.y, "z": translation.z},
-        "rotation": {
-            "x": rotation.im.x, "y": rotation.im.y, "z": rotation.im.z,
-            "w": rotation.re}
-    }
+    # rel_transform = tooth.relativeTransform(stage)
+    # if tooth is not None and hasattr(tooth, "relativeTransform"):
+    try:
+        translation = tooth.relativeTransform(stage).translation
+        rotation = tooth.relativeTransform(stage).rotation
+        return {
+            "translation": {
+                "x": translation.x, "y": translation.y, "z": translation.z},
+            "rotation": {
+                "x": rotation.im.x, "y": rotation.im.y, "z": rotation.im.z,
+                "w": rotation.re}
+        }
+    except:
+        print(f"toothID {tooth} has no relativeTransform for stage {stage}")
+        print(f"tooth has attr relativeTransform {hasattr(tooth, 'relativeTransform')}")
+        return {
+            "translation": {"x": 0.0, "y": 0.0, "z": 0.0},
+            "rotation": {"x": 0.0, "y": 0.0, "z": 0.0, "w": 1.0}
+        }
 
 def getToothRelativeTransformHead(tooth, stage, mandibular_rt, maxillary_rt) -> Dict[str, Dict[str, Any]]:
     tooth_id = tooth.getClinicalID()

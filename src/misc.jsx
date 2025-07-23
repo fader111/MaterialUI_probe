@@ -5,6 +5,15 @@ import * as THREE from 'three'
 
 // Rigid Transforms as a Translation + Quaternion
 export function rt(obj_) {
+  if (!obj_ || !obj_.translation || !obj_.rotation ||
+      obj_.translation.x === undefined || obj_.translation.y === undefined || obj_.translation.z === undefined ||
+      obj_.rotation.x === undefined || obj_.rotation.y === undefined || obj_.rotation.z === undefined || obj_.rotation.w === undefined) {
+    // Return identity transform if missing
+    return {
+      translation: new THREE.Vector3(0, 0, 0),
+      quaternion: new THREE.Quaternion(0, 0, 0, 1)
+    };
+  }
   const obj_trans = new THREE.Vector3(
     parseFloat(obj_.translation.x),
     parseFloat(obj_.translation.y),

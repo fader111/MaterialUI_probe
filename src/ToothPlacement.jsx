@@ -50,7 +50,7 @@ export const ToothPlacement = forwardRef((props, ref) => {
 
         if (caseStagingData && stagesNum > 0) {
             for (const toothID in stagingDataT2.RelativeToothTransformsHead) {
-
+                
                 const toothRt = rt(caseStagingData[stage]?.RelativeToothTransformsHead?.[toothID]);
                 const toothRtT1 = rt(stagingDataT1.RelativeToothTransformsHead[toothID]);
                 const toothRtT2 = rt(stagingDataT2.RelativeToothTransformsHead[toothID]);
