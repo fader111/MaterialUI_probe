@@ -26,6 +26,7 @@ def getToothRelativeTransform(tooth, stage):
 
 def getToothRelativeTransformHead(tooth, stage, mandibular_rt, maxillary_rt) -> Dict[str, Dict[str, Any]]:
     tooth_id = tooth.getClinicalID()
+    # jaw_rt = mandibular_rt if isLower(tooth_id) else maxillary_rt # TODO рефакторить используя isLower 
     jaw_rt = mandibular_rt if tooth_id > 30 else maxillary_rt # TODO рефакторить используя isLower 
     tooth_rt = getToothRelativeTransform(tooth, stage)
     t = tooth_rt["translation"]

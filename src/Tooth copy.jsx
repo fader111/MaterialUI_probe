@@ -1,6 +1,6 @@
 import React from 'react';
 import { useLoader, useFrame } from '@react-three/fiber';
-import { TransformControls, Html, Text } from '@react-three/drei';
+import { TransformControls, Html } from '@react-three/drei';
 import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import * as THREE from 'three'
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader';
@@ -154,7 +154,17 @@ export function Tooth(props) {
     >
       {combinedGeometries.crownGeometry && <mesh geometry={combinedGeometries.crownGeometry} material={crownMaterial} />}
       {combinedGeometries.rootGeometry && <mesh geometry={combinedGeometries.rootGeometry} material={rootMaterial} />}
-      <ToothNumberLabel toothID={toothID} />
+      {/* Show tooth number in black next to each existing tooth */}
+      <Html style={{ 
+        color: 'darkgrey', 
+        fontWeight: 'bold', 
+        // background: 'rgba(255,255,255,0.2)', 
+        // padding: '2px 6px', 
+        // borderRadius: '3px', 
+        fontSize: '14px' }}
+      >
+        {toothID}
+      </Html>
       {showLandmarks && (
         <>
           <LandMark lmType="BCPoint" color="darkorange" />
@@ -169,7 +179,8 @@ export function Tooth(props) {
         />
       )}
     </group>
-  );
+  )
+  ;
 
   const [isDragging, setIsDragging] = useState(false);
   const [initialTransform, setInitialTransform] = useState(null);
@@ -277,7 +288,6 @@ export function Tooth(props) {
   //   console.log(`Tooth ${toothID} quaternion:`, quaternion);}
   // }, [toothID, stagingData, position, quaternion]);
 
-
   return (
     <>
       {meshContent}
@@ -299,35 +309,5 @@ export function Tooth(props) {
         </>
       )}
     </>
-  );
-}
-
-// 3D label for tooth number
-function ToothNumberLabel({ toothID }) {
-  // Support supernumerary teeth: if id > 50 and id-40 is a valid tooth, treat as supernumerary
-  const idNum = parseInt(toothID);
-  let displayID = toothID;
-  let isSupernumerary = false;
-  if (idNum > 50 && idNum - 40 > 0 && idNum - 40 < 50) {
-    // displayID = `${idNum - 40}`;
-    isSupernumerary = true;
-  }
-  const isUpper = idNum < 30 || (isSupernumerary && idNum - 40 < 30);
-  const isAnterior = (isSupernumerary ? (idNum - 40) : idNum) % 10 <= 3;
-  const position = isAnterior ? [0, -4, 5] : [0, -6, 3];
-  const rotation = isUpper ? [Math.PI / 2, 0, Math.PI] : [Math.PI / 2, 0, 0];
-  return (
-    <Text
-      position={position}
-      rotation={rotation}
-      fontSize={1.0}
-      color={isSupernumerary ? "#b22222" : "black"}
-      anchorX="center"
-      anchorY="middle"
-      outlineWidth={0.04}
-      outlineColor={isSupernumerary ? "#ffcccc" : "white"}
-    >
-      {displayID}
-    </Text>
   );
 }

@@ -121,7 +121,8 @@ export default function Ortho(props) {
     try {
       const base_case_id = baseCaseFilename || '00000000';
       // const template_case_id = '00000000'; // TODO: make dynamic if needed
-      const template_case_id = '120076_1'; // TODO: make dynamic if needed
+      const template_case_id = 'templates/damon_class1_1'; // TODO: make dynamic if needed
+      // const template_case_id = '120076_1'; // TODO: make dynamic if needed
       // const template_case_id = '103931_8.4'; // TODO: make dynamic if needed
       // const template_case_id = '120737_1'; // cs rotated on 90 - 12 teeth per jaw!!!
       const response = await fetch('http://localhost:8000/predict-t2/', {

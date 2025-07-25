@@ -262,7 +262,7 @@ export default function Overlay({ children, stage, maxStage, onStageChange, onVi
   // Pattern selection state
   const [archType, setArchType] = React.useState('Damon'); // Damon, Parabolic, Natural
   const [expand, setExpand] = React.useState(false);
-  const [moveType, setMoveType] = React.useState(''); // Distalize, Mezialize, ''
+  const [moveType, setMoveType] = React.useState(''); // Molar Class1, Molar Class2, ''
 
   return (
     <Box sx={{ height: '100vh', width: '100vw', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1, overflow: 'hidden' }}>
@@ -345,7 +345,7 @@ export default function Overlay({ children, stage, maxStage, onStageChange, onVi
           </Button>
           {/* Move type (only one selectable) */}
           <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 1, mt: 1 }}>
-            {['Distalize', 'Mezialize'].map(pattern => (
+            {['Molar Class1', 'Molar Class2'].map(pattern => (
               <Button
                 key={pattern}
                 variant={moveType === pattern ? 'contained' : 'text'}
