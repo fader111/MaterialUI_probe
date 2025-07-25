@@ -25,3 +25,6 @@ dist-ssr
 public/roots/*
 public/shortRoots/*
 public/crowns/*
+*.lock
+server/__pycache__/*
+server/inference/__pycache__/*
