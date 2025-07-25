@@ -48,6 +48,9 @@ export default function Ortho(props) {
   // New state for left panel
   const [shortRoots, setShortRoots] = useState(true);
   const [showLandmarks, setShowLandmarks] = useState(false);
+  // New state for template selection
+  const [archType, setArchType] = useState('Damon'); // Damon, Parabolic, Natural
+  const [moveType, setMoveType] = useState('Molar Class1'); // Molar Class1, Molar Class2
 
   // Use orthoData, setOrthoData, isFileLoaded, loading, baseCaseFilename from props?
 
@@ -120,11 +123,11 @@ export default function Ortho(props) {
     console.log("handlePredictT2 called");
     try {
       const base_case_id = baseCaseFilename || '00000000';
-      // const template_case_id = '00000000'; // TODO: make dynamic if needed
-      const template_case_id = 'templates/damon_class1_1'; // TODO: make dynamic if needed
-      // const template_case_id = '120076_1'; // TODO: make dynamic if needed
-      // const template_case_id = '103931_8.4'; // TODO: make dynamic if needed
-      // const template_case_id = '120737_1'; // cs rotated on 90 - 12 teeth per jaw!!!
+      // Build template_case_id dynamically
+      let arch = archType.toLowerCase();
+      let molar = moveType === 'Mesialize' ? 'class2' : 'class1';
+      const template_case_id = `templates/${arch}_${molar}`;
+      console.log('PredictT2: base_case_id:', base_case_id, 'archType:', archType, 'moveType:', moveType, 'template_case_id:', template_case_id);
       const response = await fetch('http://localhost:8000/predict-t2/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -148,7 +151,7 @@ export default function Ortho(props) {
     } catch (err) {
       console.error(err);
     }
-  }, [baseCaseFilename, setOrthoData]);
+  }, [baseCaseFilename, setOrthoData, archType, moveType]);
 
   // Handler for Init Predict (now updates orthoData.Staging like handlePredictT2)
   const handlePredictInit = useCallback(async () => {
@@ -200,6 +203,10 @@ export default function Ortho(props) {
         onStageChange={setStage}
         onFileLoaded={onFileLoaded}
         baseCaseFilename={baseCaseFilename}
+        archType={archType}
+        setArchType={setArchType}
+        moveType={moveType}
+        setMoveType={setMoveType}
       >
         {loading ? (
           <div style={{ textAlign: 'center', marginTop: '20%' }}>Loading...</div>

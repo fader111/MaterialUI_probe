@@ -236,7 +236,7 @@ function RightPanel({ onViewSelect }) {
   )
 }
 
-export default function Overlay({ children, stage, maxStage, onStageChange, onViewSelect, onShortRootsToggle, shortRoots, onLandmarksToggle, showLandmarks, onPredictT2, onPredictInit, onFileLoaded, baseCaseFilename }) {
+export default function Overlay({ children, stage, maxStage, onStageChange, onViewSelect, onShortRootsToggle, shortRoots, onLandmarksToggle, showLandmarks, onPredictT2, onPredictInit, onFileLoaded, baseCaseFilename, archType, setArchType, moveType, setMoveType }) {
   const [status, setStatus] = React.useState(() => localStorage.getItem('status') || '');
   const [loading, setLoading] = React.useState(false);
   const loadingRef = React.useRef(false);
@@ -260,9 +260,8 @@ export default function Overlay({ children, stage, maxStage, onStageChange, onVi
   }, []);
 
   // Pattern selection state
-  const [archType, setArchType] = React.useState('Damon'); // Damon, Parabolic, Natural
+  // archType, setArchType, moveType, setMoveType are now controlled from parent (Ortho)
   const [expand, setExpand] = React.useState(false);
-  const [moveType, setMoveType] = React.useState(''); // Molar Class1, Molar Class2, ''
 
   return (
     <Box sx={{ height: '100vh', width: '100vw', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1, overflow: 'hidden' }}>
@@ -287,6 +286,9 @@ export default function Overlay({ children, stage, maxStage, onStageChange, onVi
         </Box>
         {/* Pattern selection panel */}
         <Box sx={{ pointerEvents: 'auto', mt: 2, bgcolor: 'rgba(245,245,245,0.5)', borderRadius: 2, p: 1, display: 'flex', flexDirection: 'column', gap: 1, alignItems: 'center' }}>
+          <Box sx={{ width: '100%', mb: 1 }}>
+            <span style={{ fontWeight: 600, fontSize: 15, color: '#686a6bff', letterSpacing: 0.5 }}>Pattern selection</span>
+          </Box>
           {/* Arch type (only one selectable) */}
           <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 1 }}>
             {['Damon', 'Parabolic', 'Natural'].map(pattern => (
@@ -345,7 +347,7 @@ export default function Overlay({ children, stage, maxStage, onStageChange, onVi
           </Button>
           {/* Move type (only one selectable) */}
           <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 1, mt: 1 }}>
-            {['Molar Class1', 'Molar Class2'].map(pattern => (
+            {['Distalize', 'Mesialize'].map(pattern => (
               <Button
                 key={pattern}
                 variant={moveType === pattern ? 'contained' : 'text'}

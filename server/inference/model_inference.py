@@ -306,7 +306,7 @@ class OrthoInferencePipeline:
         init_prediction_points, _ = self.ae.predict(base_case_points_t1, base_case_points_t2)
         
         predictions, _ = self.reg.predict(init_prediction_points, template_diff, template_points_t2) if self.reg else (init_prediction_points, 0)
-        show_2_cloud_points_in_pv(predictions, template_points_t2, title="Regressor Predictions (red) and Template T2 (blue)")
+        # show_2_cloud_points_in_pv(predictions, template_points_t2, title="Regressor Predictions (red) and Template T2 (blue)")
         # Compose transforms
         transforms_dict = self._compose_transforms_from_points(base_loader, predictions, base_case_points_t1_) 
 
