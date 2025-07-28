@@ -51,6 +51,8 @@ export default function Ortho(props) {
   // New state for template selection
   const [archType, setArchType] = useState('Damon'); // Damon, Parabolic, Natural
   const [moveType, setMoveType] = useState('Molar Class1'); // Molar Class1, Molar Class2
+  // New state for T2 predict mode
+  const [t2PredictMode, setT2PredictMode] = useState('template'); // 'template' or 'pattern'
 
   // Use orthoData, setOrthoData, isFileLoaded, loading, baseCaseFilename from props?
   // useEffect(() => {
@@ -133,9 +135,12 @@ export default function Ortho(props) {
       let arch = archType.toLowerCase();
       let molar = moveType === 'Mesialize' ? 'class2' : 'class1';
       const template_case_id = `templates/${arch}_${molar}`;
-      console.log('PredictT2: base_case_id:', base_case_id, 'archType:', archType, 'moveType:', moveType, 'template_case_id:', template_case_id);
       const StageT2Idx = orthoData.Staging.length - 1; // Last stage is T2
-      const template_transforms = orthoData.Staging[StageT2Idx].RelativeToothTransformsHead;
+      let template_transforms = {};
+      if (t2PredictMode === 'pattern') {
+        template_transforms = orthoData.Staging[StageT2Idx].RelativeToothTransformsHead || {};
+      }
+      console.log('PredictT2:', { base_case_id, archType, moveType, template_case_id, t2PredictMode, template_transforms });
       // console.log('Using templateTransforms for T2 prediction:', orthoData.Staging[StageT2Idx].RelativeToothTransformsHead);
       const response = await fetch('http://localhost:8000/predict-t2/', {
         method: 'POST',
@@ -143,7 +148,7 @@ export default function Ortho(props) {
         body: JSON.stringify({ 
           base_case_id, 
           template_case_id, 
-          template_transforms: template_transforms || {}
+          template_transforms
         })
       });
       if (!response.ok) {
@@ -164,7 +169,7 @@ export default function Ortho(props) {
     } catch (err) {
       console.error(err);
     }
-  }, [baseCaseFilename, orthoData, setOrthoData, archType, moveType]);
+  }, [baseCaseFilename, orthoData, setOrthoData, archType, moveType, t2PredictMode]);
 
   // Handler for Init Predict (now updates orthoData.Staging like handlePredictT2)
   const handlePredictInit = useCallback(async () => {
@@ -220,6 +225,8 @@ export default function Ortho(props) {
         setArchType={setArchType}
         moveType={moveType}
         setMoveType={setMoveType}
+        t2PredictMode={t2PredictMode}
+        setT2PredictMode={setT2PredictMode}
       >
         {loading ? (
           <div style={{ textAlign: 'center', marginTop: '20%' }}>Loading...</div>

@@ -137,14 +137,14 @@ function LeftPanel({ onShortRootsToggle, shortRoots, onLandmarksToggle, showLand
       onClick: onLandmarksToggle
     },
     {
-      key: 'predict',
-      label: 'Predict T2',
-      onClick: onPredictT2
-    },
-    {
       key: 'predictInit',
       label: 'Init Predict',
       onClick: onPredictInit
+    },
+    {
+      key: 'predict',
+      label: 'Predict T2',
+      onClick: onPredictT2
     }
   ];
   return (
@@ -236,7 +236,7 @@ function RightPanel({ onViewSelect }) {
   )
 }
 
-export default function Overlay({ children, stage, maxStage, onStageChange, onViewSelect, onShortRootsToggle, shortRoots, onLandmarksToggle, showLandmarks, onPredictT2, onPredictInit, onFileLoaded, baseCaseFilename, archType, setArchType, moveType, setMoveType }) {
+export default function Overlay({ children, stage, maxStage, onStageChange, onViewSelect, onShortRootsToggle, shortRoots, onLandmarksToggle, showLandmarks, onPredictT2, onPredictInit, onFileLoaded, baseCaseFilename, archType, setArchType, moveType, setMoveType, t2PredictMode, setT2PredictMode }) {
   const [status, setStatus] = React.useState(() => localStorage.getItem('status') || '');
   const [loading, setLoading] = React.useState(false);
   const loadingRef = React.useRef(false);
@@ -260,7 +260,7 @@ export default function Overlay({ children, stage, maxStage, onStageChange, onVi
   }, []);
 
   // Pattern selection state
-  // archType, setArchType, moveType, setMoveType are now controlled from parent (Ortho)
+  // archType, setArchType, moveType, setMoveType, t2PredictMode, setT2PredictMode are now controlled from parent (Ortho)
   const [expand, setExpand] = React.useState(false);
 
   return (
@@ -286,6 +286,32 @@ export default function Overlay({ children, stage, maxStage, onStageChange, onVi
         </Box>
         {/* Pattern selection panel */}
         <Box sx={{ pointerEvents: 'auto', mt: 2, bgcolor: 'rgba(245,245,245,0.5)', borderRadius: 2, p: 1, display: 'flex', flexDirection: 'column', gap: 1, alignItems: 'center' }}>
+          {/* T2 Predict Mode Toggle Button at top */}
+          <Button
+            variant="contained"
+            size="small"
+            sx={{
+              minWidth: 0,
+              p: 1,
+              borderRadius: 2,
+              background: '#0e83f1',
+              color: 'white',
+              fontWeight: 500,
+              fontSize: 12,
+              width: '100%',
+              height: 36,
+              mb: 1,
+              boxShadow: 'none',
+              border: 'none',
+              outline: 'none',
+              '&:focus': { border: 'none', outline: 'none' },
+              '&:active': { border: 'none', outline: 'none' },
+              '&:hover': { background: '#1565c0' },
+            }}
+            onClick={() => setT2PredictMode(t2PredictMode === 'template' ? 'pattern' : 'template')}
+          >
+            {t2PredictMode === 'template' ? 'Use template' : 'Manual'}
+          </Button>
           <Box sx={{ width: '100%', mb: 1 }}>
             <span style={{ fontWeight: 600, fontSize: 15, color: '#686a6bff', letterSpacing: 0.5 }}>Pattern selection</span>
           </Box>
@@ -319,6 +345,8 @@ export default function Overlay({ children, stage, maxStage, onStageChange, onVi
               </Button>
             ))}
           </Box>
+          {/* T2 Predict Mode Selection */}
+          {/* Removed dual mode buttons, replaced by single toggle above */}
           {/* Expand (toggle) */}
           <Button
             variant={expand ? 'contained' : 'text'}
