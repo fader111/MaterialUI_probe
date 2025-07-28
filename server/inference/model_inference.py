@@ -165,6 +165,8 @@ class OrthoCaseLoader:
             self.ortho_case = OrthoCase(file_path)
     def get_landmarks(self):
         return case_landmark_grids(self.ortho_case)
+    def get_landmarks_orgins(self):
+        return case_landmark_grids_orgins(self.ortho_case)
     def get_tooth_by_cl_id(self, tooth_id):
         return self.ortho_case.get_tooth_by_cl_id(tooth_id)
 
@@ -264,6 +266,35 @@ class OrthoInferencePipeline:
             }
         return transforms_dict
     
+    def apply_transform_to_point_cloud(self, points, transforms: Dict[str, Dict[str, Any]]) -> np.ndarray:
+        """
+        Applies a rigid transformation to a point cloud.
+        :param points: numpy array of shape (N_teeth, N_points, 3) representing the point cloud.
+        :param transforms: dictionary with 'translation' and 'rotation' keys.
+        :return: transformed points in the same shape as input.
+        """
+        # transforms = {}
+        # zero_transform = {
+            # "translation": {"x": 0.0, "y": 0.0, "z": 1.0},
+            # "rotation": {"x": 0.0, "y": 0.0, "z": 0.0, "w": 1.0} # STUB!!! remove!!!!
+        # }
+        points_ = points.copy()
+        for idx, tooth_id in enumerate(dw_teeth_nums14 + up_teeth_nums14):
+            
+            # print(str(tooth_id), json.dumps(transforms[str(tooth_id)])) # STUB !! remove!!!
+
+            # transforms[str(tooth_id)] = zero_transform
+            
+            if str(tooth_id) not in transforms:
+                print(f"[ERROR] Tooth {tooth_id} not found in transforms dictionary.")
+                continue
+            
+            tooth_points = points_[idx]
+            tr_matrix = get_transform_matrix_from_three_rt(transforms[str(tooth_id)])
+            transformed_points = apply_rigid_transform(tooth_points, tr_matrix)
+            points_[idx] = transformed_points
+        return points_
+    
     def point_cloud_to_jaw(self, points, mandibular_jaw_rt, maxillary_jaw_rt):
         """
         Transforms a point cloud to the jaw coordinate system.
@@ -282,26 +313,40 @@ class OrthoInferencePipeline:
             points_[tooth_idx] = transformed_points
         return points_
     
-    def run_t2_predict(self, base_case_path, template_case_path) -> Dict[str, Dict[str, Any]]:
+    def run_t2_predict(self, base_case_path, template_case_path, template_transforms=None) -> Dict[str, Dict[str, Any]]:
         base_loader = OrthoCaseLoader(base_case_path)
         template_loader = OrthoCaseLoader(template_case_path)
         base_case_points_t1, base_case_points_t2 = base_loader.get_landmarks()
         template_points_t1, template_points_t2 = template_loader.get_landmarks()
+        base_case_points_origins = base_loader.get_landmarks_orgins()
 
         # Apply jaw transformations to base and template point clouds
         base_mandible_jaw_rt = base_loader.ortho_case.tp.GetJaw(JawType.Mandible).relativeTransform(0)
         base_maxilla_jaw_rt = base_loader.ortho_case.tp.GetJaw(JawType.Maxilla).relativeTransform(0)
         template_mandible_jaw_rt = template_loader.ortho_case.tp.GetJaw(JawType.Mandible).relativeTransform(0)
         template_maxilla_jaw_rt = template_loader.ortho_case.tp.GetJaw(JawType.Maxilla).relativeTransform(0)
-
+        
         base_case_points_t1_ = base_case_points_t1.copy() # orig points for compose transforms
+
+        # вводим новый режим: если есть на входе template_transforms, то это значит что используем корретированные 
+        # трансформ контролом новые положения зубов базового кейса в качестве шаблона.
+        # теперь нам нужны новые точки шаблона в T2т.к. только точки можно отправить в предикт. 
+        # у нас есть их трансформы - похоже это трансформы относительно локальных (нулевых координат), к лендмаркам базового кейса
+
+        # для режима коррекции темплейта с фронта
+        template_points_t2_front = self.apply_transform_to_point_cloud(base_case_points_origins, template_transforms)
+        # show_2_cloud_points_in_pv(base_case_points_t1, template_points_t2_front, title="t1_ (red) Transformed T2 (blue)")
+
         base_case_points_t1 = self.point_cloud_to_jaw(base_case_points_t1, base_mandible_jaw_rt, base_maxilla_jaw_rt)
         base_case_points_t2 = self.point_cloud_to_jaw(base_case_points_t2, base_mandible_jaw_rt, base_maxilla_jaw_rt)
 
         template_points_t1 = self.point_cloud_to_jaw(template_points_t1, template_mandible_jaw_rt, template_maxilla_jaw_rt)
         template_points_t2 = self.point_cloud_to_jaw(template_points_t2, template_mandible_jaw_rt, template_maxilla_jaw_rt)
 
-        template_diff = template_points_t2 - template_points_t1
+        if template_transforms is not None:
+            template_diff = template_points_t2_front - base_case_points_t1
+        else:
+            template_diff = template_points_t2 - template_points_t1
 
         init_prediction_points, _ = self.ae.predict(base_case_points_t1, base_case_points_t2)
         
@@ -310,9 +355,9 @@ class OrthoInferencePipeline:
         # Compose transforms
         transforms_dict = self._compose_transforms_from_points(base_loader, predictions, base_case_points_t1_) 
 
-        # transform to Head coordinates
+        # transform to Head coordinates no needs anymore due to work in head cs for now.
         # transforms_dict = self._compose_transforms_to_jaw(transforms_dict, base_mandible_jaw_rt, base_maxilla_jaw_rt)
-        print(f"T2 inference done (class pipeline)")
+        print(f"T2 inference done from {'extern file' if template_transforms is None else 'T2'}")
         return transforms_dict
 
     def run_init_predict(self, base_case_path) -> Dict[str, Dict[str, Any]]:

@@ -53,7 +53,9 @@ export default function Ortho(props) {
   const [moveType, setMoveType] = useState('Molar Class1'); // Molar Class1, Molar Class2
 
   // Use orthoData, setOrthoData, isFileLoaded, loading, baseCaseFilename from props?
-
+  // useEffect(() => {
+  //   console.log("[DEBUG] Ortho.jsx orthoData updated:", orthoData);
+  // }, [orthoData]);
   // Handle T2Stage updates
   useEffect(() => {
     setT2Stage(orthoData && orthoData.Staging && orthoData.Staging.length > 0 ? orthoData.T2Stage -1 : 0)
@@ -120,7 +122,11 @@ export default function Ortho(props) {
   
   // Handler for T2 prediction (refactored to update orthoData.Staging)
   const handlePredictT2 = useCallback(async () => {
-    console.log("handlePredictT2 called");
+    // console.log("handlePredictT2 called");
+    if (!orthoData || !orthoData.Staging || orthoData.Staging.length === 0) {
+      console.error("handlePredictT2: orthoData or orthoData.Staging is null/empty");
+      return;
+    }
     try {
       const base_case_id = baseCaseFilename || '00000000';
       // Build template_case_id dynamically
@@ -128,10 +134,17 @@ export default function Ortho(props) {
       let molar = moveType === 'Mesialize' ? 'class2' : 'class1';
       const template_case_id = `templates/${arch}_${molar}`;
       console.log('PredictT2: base_case_id:', base_case_id, 'archType:', archType, 'moveType:', moveType, 'template_case_id:', template_case_id);
+      const StageT2Idx = orthoData.Staging.length - 1; // Last stage is T2
+      const template_transforms = orthoData.Staging[StageT2Idx].RelativeToothTransformsHead;
+      // console.log('Using templateTransforms for T2 prediction:', orthoData.Staging[StageT2Idx].RelativeToothTransformsHead);
       const response = await fetch('http://localhost:8000/predict-t2/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ base_case_id, template_case_id })
+        body: JSON.stringify({ 
+          base_case_id, 
+          template_case_id, 
+          template_transforms: template_transforms || {}
+        })
       });
       if (!response.ok) {
         throw new Error('Prediction failed');
@@ -151,7 +164,7 @@ export default function Ortho(props) {
     } catch (err) {
       console.error(err);
     }
-  }, [baseCaseFilename, setOrthoData, archType, moveType]);
+  }, [baseCaseFilename, orthoData, setOrthoData, archType, moveType]);
 
   // Handler for Init Predict (now updates orthoData.Staging like handlePredictT2)
   const handlePredictInit = useCallback(async () => {

@@ -269,15 +269,6 @@ export function Tooth(props) {
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [isClicked]);
   
-  // Debug: log transformation data for each tooth
-  // useEffect(() => {
-  //   // console.log(`Tooth ${toothID} stagingData:`, stagingData);
-  //   if (toothID == '11') {
-  //   console.log(`Tooth ${toothID} position:`, position);
-  //   console.log(`Tooth ${toothID} quaternion:`, quaternion);}
-  // }, [toothID, stagingData, position, quaternion]);
-
-
   return (
     <>
       {meshContent}
@@ -288,6 +279,8 @@ export function Tooth(props) {
             mode={transformMode}
             size={0.7}
             object={toothRef.current}
+            space="local"
+            // lineWidth={9} // Это не катит - надо форкать и менять контрол или использовать THREE вариант
             onMouseDown={handleTransformStart}
             onMouseUp={handleTransformEnd}
             // onObjectChange={handleObjectChange}

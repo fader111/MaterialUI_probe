@@ -108,14 +108,16 @@ def export_teeth(request: ExportTeethRequest):
 @app.post("/predict-t2/")
 def predict_t2(
     base_case_id: str = Body(...),
-    template_case_id: str = Body(...)
+    template_case_id: str = Body(...),
+    template_transforms: Optional[Dict[str, Any]] = Body(None, embed=True)
 ):
+    # print(f"template_transforms {json.dumps(template_transforms)}")
     base_case_path = os.path.join("server", f"{base_case_id}.oas")
     template_case_path = os.path.join("server", f"{template_case_id}.oas")
     ae_ckpt = "server/inference/init_ae/best_model.pth"
     reg_ckpt = "server/inference/arch_regressor/best_model.pth"
     pipeline = OrthoInferencePipeline(ae_ckpt, reg_ckpt)
-    result = pipeline.run_t2_predict(base_case_path, template_case_path)
+    result = pipeline.run_t2_predict(base_case_path, template_case_path, template_transforms)
     return result
 
 @app.post("/predict-init/")
