@@ -122,4 +122,44 @@ This application is a full-stack dental visualization and prediction tool built 
 
 ---
 
+## Deployment with Docker
+
+### Prerequisites
+- Docker installed on your server (https://docs.docker.com/get-docker/)
+
+### Build and Run
+
+1. **Clone the repository and enter the project directory:**
+   ```sh
+   git clone <your-repo-url>
+   cd MaterialsUI_probe
+   ```
+
+2. **Build the Docker image:**
+   ```sh
+   docker build -t dental-ortho-app .
+   ```
+
+3. **Run the container:**
+   ```sh
+   docker run -d -p 8000:8000 --name dental-ortho-app dental-ortho-app
+   ```
+   - The backend API will be available at `http://<server-ip>:8000`
+   - The frontend static files are served from `/frontend_dist` (adjust serving as needed)
+
+### Notes
+- The Dockerfile builds both backend (FastAPI) and frontend (Vite/React) in a single image.
+- If you need to serve the frontend separately (e.g., with nginx), copy the `frontend_dist` folder from the image and serve it as static files.
+- Adjust the backend start command in the Dockerfile if your entrypoint is different.
+- Make sure to update `requirements.txt` with any additional Python dependencies your backend needs.
+
+---
+
+## Troubleshooting
+- If you get errors about missing Python or Node packages, check that all dependencies are listed in `requirements.txt` and `package.json`.
+- For GPU/ML support, you may need to use a different base image (e.g., `nvidia/cuda` for PyTorch with CUDA).
+- For production, consider using a process manager (e.g., gunicorn) and a reverse proxy (e.g., nginx) for better performance and security.
+
+---
+
 For more details, see the code in `src/` (frontend) and `server/` (backend).

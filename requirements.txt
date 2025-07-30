@@ -1,0 +1,9 @@
+# Python backend requirements
+fastapi
+uvicorn[standard]
+numpy
+scipy
+torch
+pyvista
+pydantic
+# Add any other backend dependencies below
