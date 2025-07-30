@@ -28,3 +28,4 @@ public/crowns/*
 *.lock
 server/__pycache__/*
 server/inference/__pycache__/*
+server/inference/__pycache__/model_inference.cpython-312.pyc
