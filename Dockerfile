@@ -20,7 +20,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # --- Frontend build stage ---
 FROM node:20-slim AS frontend
 WORKDIR /frontend
-COPY package.json package-lock.json* vite.config.js .
+COPY package.json package-lock.json* vite.config.js ./ 
+COPY index.html ./
 COPY public ./public
 COPY src ./src
 RUN npm install && npm run build
