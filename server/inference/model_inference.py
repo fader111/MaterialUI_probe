@@ -337,7 +337,9 @@ class OrthoInferencePipeline:
             # для режима коррекции темплейта с фронта
             template_points_t2_front = self.apply_transform_to_point_cloud(base_case_points_origins, template_transforms)
             # show_2_cloud_points_in_pv(base_case_points_t1, template_points_t2_front, title="t1_ (red) Transformed T2 (blue)")
-            template_diff = template_points_t2_front - base_case_points_t1
+            
+            # template_diff = template_points_t2_front - base_case_points_t1 # for diff mode
+            template_diff = template_points_t2_front
             template_points_t2 = None # stub
         else:
             template_loader = OrthoCaseLoader(template_case_path)
@@ -348,7 +350,9 @@ class OrthoInferencePipeline:
             # Apply jaw transformations to template point clouds
             template_points_t1 = self.point_cloud_to_jaw(template_points_t1, template_mandible_jaw_rt, template_maxilla_jaw_rt)
             template_points_t2 = self.point_cloud_to_jaw(template_points_t2, template_mandible_jaw_rt, template_maxilla_jaw_rt)
-            template_diff = template_points_t2 - template_points_t1
+            
+            # template_diff = template_points_t2 - template_points_t1 # for diff mode
+            template_diff = template_points_t2
 
         init_prediction_points, _ = self.ae.predict(base_case_points_t1, base_case_points_t2)
         

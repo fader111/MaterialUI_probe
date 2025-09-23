@@ -1,10 +1,12 @@
 import React from 'react';
 import { useLoader, useFrame } from '@react-three/fiber';
 import { TransformControls, Html, Text } from '@react-three/drei';
+// import { Html, Text } from '@react-three/drei';
 import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import * as THREE from 'three'
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader';
-import { TextureLoader } from 'three/src/loaders/TextureLoader'
+import { TextureLoader } from 'three/src/loaders/TextureLoader';
+import CombinedTransformControls from "./CombinedTransformControls";
 
 export function Tooth(props) {  
   const { toothID, url, stagingData, onTransform, landmarks, trackballControlsRef, isClicked, onToothClick, useShortRoots = false, showLandmarks = true } = props;

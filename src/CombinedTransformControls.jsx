@@ -39,14 +39,14 @@ export default function CombinedTransformControls({ object, enabled = true, onOb
   return (
     <>
       <TransformControls
-        ref={translateRef}
+        // ref={translateRef}
         object={object}
         mode="translate"
         enabled={enabled}
         showX
         showY
         showZ
-        size={2.5} // Make arrows and orbits thicker/larger
+        size={0.7} // Make arrows and orbits thicker/larger
         axisThickness={8} // Custom prop for Drei v10+ (if available)
         lineWidth={8} // For some Drei/three.js versions
       />
@@ -58,7 +58,7 @@ export default function CombinedTransformControls({ object, enabled = true, onOb
         showX
         showY
         showZ
-        size={2.5}
+        size={0.7}
         axisThickness={8}
         lineWidth={8}
       />

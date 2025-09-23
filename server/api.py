@@ -116,6 +116,8 @@ def predict_t2(
     template_case_path = os.path.join("server", f"{template_case_id}.oas")
     ae_ckpt = "server/inference/init_ae/best_model.pth"
     reg_ckpt = "server/inference/arch_regressor/best_model.pth"
+    # reg_ckpt = "server/inference/arch_regressor/best_model_1500.pth"
+    # reg_ckpt = "server/inference/arch_regressor/best_model_template_diff.pth" # for difference mode
     pipeline = OrthoInferencePipeline(ae_ckpt, reg_ckpt)
     result = pipeline.run_t2_predict(base_case_path, template_case_path, template_transforms)
     return result

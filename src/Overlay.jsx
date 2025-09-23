@@ -375,7 +375,7 @@ export default function Overlay({ children, stage, maxStage, onStageChange, onVi
           </Button>
           {/* Move type (only one selectable) */}
           <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 1, mt: 1 }}>
-            {['Distalize', 'Mesialize'].map(pattern => (
+            {['Class I', 'Class II'].map(pattern => (
               <Button
                 key={pattern}
                 variant={moveType === pattern ? 'contained' : 'text'}
@@ -422,6 +422,7 @@ export default function Overlay({ children, stage, maxStage, onStageChange, onVi
               min={0}
               max={typeof maxStage === 'number' && maxStage > 0 ? maxStage : 1}
               step={1}
+              // step={maxStage}
               onChange={(_, v) => onStageChange && onStageChange(v)}
               valueLabelDisplay="auto"
               aria-label="Stage Slider"

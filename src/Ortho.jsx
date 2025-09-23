@@ -133,7 +133,7 @@ export default function Ortho(props) {
       const base_case_id = baseCaseFilename || '00000000';
       // Build template_case_id dynamically
       let arch = archType.toLowerCase();
-      let molar = moveType === 'Mesialize' ? 'class2' : 'class1';
+      let molar = moveType === 'Class II' ? 'class2' : 'class1';
       const template_case_id = `templates/${arch}_${molar}`;
       const StageT2Idx = orthoData.Staging.length - 1; // Last stage is T2
       let template_transforms = {};
