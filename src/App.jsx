@@ -34,6 +34,7 @@ function App() {
       });
       if (!response.ok) throw new Error('Failed to reload orthoData');
       const data = await response.json();
+      // console.log('Reloaded orthoData:', data);
       setOrthoData(data);
       setBaseCaseFilename(base_case_id);
       setIsFileLoaded(true);

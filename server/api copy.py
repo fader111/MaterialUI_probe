@@ -5,15 +5,12 @@ from pydantic import BaseModel
 import os
 import shutil
 import glob
-# from subprocess import run, PIPE
-import subprocess
-import multiprocessing
+from subprocess import run, PIPE
 import sys
 from autosetup_ml.utils import *
 from server.inference.model_inference import OrthoInferencePipeline
 from fastapi import Body
-# from backend.ormco import JawType, LandmarkID
-import json
+from backend.ormco import JawType, LandmarkID
 from server.ortho_data import OrthoData
 from typing import List, Dict, Any
 import numpy as np
@@ -22,8 +19,6 @@ from concurrent.futures import ThreadPoolExecutor
 from scipy.spatial.transform import Rotation as R
 
 app = FastAPI()
-
-EXE_PATH = r"E:\WebGLServer\orthoplatform\Build\windows-msbuild-cl\Bin\OASDatabase\Release\OASDatabase.exe"
 
 # Allow CORS for local frontend
 app.add_middleware(
@@ -35,7 +30,6 @@ app.add_middleware(
 )
 
 OAS_DIR = os.path.join(os.path.dirname(__file__), "./")
-PUBLIC_DIR = os.path.join(os.path.dirname(__file__), "../public/")
 MESH_DIR = os.path.join(os.path.dirname(__file__), "../public/meshes/")
 ROOTS_DIR = os.path.join(os.path.dirname(__file__), "../public/roots/")
 SHORTROOTS_DIR = os.path.join(os.path.dirname(__file__), "../public/shortRoots/")
@@ -48,88 +42,65 @@ ortho_case_cache = {
 class ExportTeethRequest(BaseModel):
     filename: str
 
-# def get_cached_ortho_case(file_path="backend/oas/00000000.oas"):
-#     if ortho_case_cache["ortho_case"] is None or ortho_case_cache["file_path"] != file_path:
-#         ortho_case_cache["file_path"] = file_path
-#         ortho_case_cache["ortho_case"] = OrthoCase(file_path)
-#     return ortho_case_cache["ortho_case"]
 
-@app.post("/oas-files/upload") # copy oas to server folder 
+def get_cached_ortho_case(file_path="backend/oas/00000000.oas"):
+    if ortho_case_cache["ortho_case"] is None or ortho_case_cache["file_path"] != file_path:
+        ortho_case_cache["file_path"] = file_path
+        ortho_case_cache["ortho_case"] = OrthoCase(file_path)
+    return ortho_case_cache["ortho_case"]
+
+@app.get("/oas-files/")
+def list_oas_files():
+    files = [os.path.basename(f) for f in glob.glob(os.path.join(OAS_DIR, "*.oas"))]
+    return {"oas_files": files}
+
+@app.get("/oas-files/{filename}")
+def get_oas_file(filename: str):
+    path = os.path.join(OAS_DIR, filename)
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(path)
+
+@app.post("/oas-files/upload")
 def upload_oas_file(file: UploadFile = File(...)):
     dest = os.path.join(OAS_DIR, file.filename)
     with open(dest, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
     return {"filename": file.filename}
 
-# @app.get("/oas-files/")
-# def list_oas_files():
-#     files = [os.path.basename(f) for f in glob.glob(os.path.join(OAS_DIR, "*.oas"))]
-#     return {"oas_files": files}
+@app.get("/meshes/{tooth_id}.stl")
+def get_mesh(tooth_id: str):
+    path = os.path.join(MESH_DIR, f"{tooth_id}.stl")
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Mesh not found")
+    return FileResponse(path, media_type="application/sla")
 
-# @app.get("/oas-files/{filename}")
-# def get_oas_file(filename: str):
-#     path = os.path.join(OAS_DIR, filename)
-#     if not os.path.exists(path):
-#         raise HTTPException(status_code=404, detail="File not found")
-#     return FileResponse(path)
+@app.get("/roots/{tooth_id}.stl")
+def get_root(tooth_id: str):
+    path = os.path.join(ROOTS_DIR, f"{tooth_id}.stl")
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Root not found")
+    return FileResponse(path, media_type="application/sla")
 
-# @app.get("/meshes/{tooth_id}.stl")
-# def get_mesh(tooth_id: str):
-#     path = os.path.join(MESH_DIR, f"{tooth_id}.stl")
-#     if not os.path.exists(path):
-#         raise HTTPException(status_code=404, detail="Mesh not found")
-#     return FileResponse(path, media_type="application/sla")
-
-# @app.get("/roots/{tooth_id}.stl")
-# def get_root(tooth_id: str):
-#     path = os.path.join(ROOTS_DIR, f"{tooth_id}.stl")
-#     if not os.path.exists(path):
-#         raise HTTPException(status_code=404, detail="Root not found")
-#     return FileResponse(path, media_type="application/sla")
-
-# @app.get("/shortRoots/{tooth_id}.stl")
-# def get_short_root(tooth_id: str):
-#     path = os.path.join(SHORTROOTS_DIR, f"{tooth_id}.stl")
-#     if not os.path.exists(path):
-#         raise HTTPException(status_code=404, detail="Short root not found")
-#     return FileResponse(path, media_type="application/sla")
+@app.get("/shortRoots/{tooth_id}.stl")
+def get_short_root(tooth_id: str):
+    path = os.path.join(SHORTROOTS_DIR, f"{tooth_id}.stl")
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Short root not found")
+    return FileResponse(path, media_type="application/sla")
 
 @app.post("/export-teeth/")
 def export_teeth(request: ExportTeethRequest):
     filename = request.filename
     oas_path = os.path.join(OAS_DIR, filename)
-    print(f"oas_path {oas_path}")
     if not os.path.isfile(oas_path):
         raise HTTPException(status_code=404, detail="OAS file not found")
     # Run the export teeth and json data script
-    # result = run([
-    #     # sys.executable, os.path.join(os.path.dirname(__file__), "export_teeth_and_json_data.py"), old one
-    #     sys.executable, os.path.join(os.path.dirname(__file__), "export_teeth_.py"),
-    #     "--filename", oas_path
-    # ], stdout=PIPE, stderr=PIPE, text=True)
-
-    # Example job, replace with dynamic args if needed
-    job = [
-        EXE_PATH,
-        "ExportTeethSurfaces",
-        oas_path,
-        PUBLIC_DIR
-    ]
-
-    # def run_oasdatabase(command_args):
-    result = subprocess.run(
-        # command_args,
-        job,
-        capture_output=True,
-        text=True,
-        # stdout=subprocess.DEVNULL,   # Suppress stdout
-        # stderr=subprocess.DEVNULL    # Suppress stderr (optional)
-    )
-        # return result
-
-    # Run job synchronously (single process)
-    # result = run_oasdatabase(job)
-
+    result = run([
+        # sys.executable, os.path.join(os.path.dirname(__file__), "export_teeth_and_json_data.py"), old one
+        sys.executable, os.path.join(os.path.dirname(__file__), "export_teeth_.py"),
+        "--filename", oas_path
+    ], stdout=PIPE, stderr=PIPE, text=True)
     if result.returncode != 0:
         return JSONResponse(status_code=500, content={"error": result.stderr})
     return {"status": "ok", "output": result.stdout}
@@ -191,30 +162,17 @@ async def get_teeth_meshes(payload: dict = Body(...)):
 async def get_case_data(base_case_id: str = Body(..., embed=True)):
     """
     Returns case data including staging and tooth transforms.
-    Accepts: { base_case_id: str }
-    Now runs subprocess to generate orthoData.json, reads it, and returns its contents.
+    Accepts: { file_path: str }
     """
-    oas_path = os.path.join(OAS_DIR, f"{base_case_id}.oas")
-    orthoDataFilePath = os.path.join(PUBLIC_DIR, "orthoData.json")
-    job = [
-        EXE_PATH,
-        "ExportStagingData",
-        oas_path,
-        orthoDataFilePath
-    ]
+    base_case_path = os.path.join("server", f"{base_case_id}.oas")
+    # print(f"DEBUG: Received base_case_id: {base_case_id}") # Log base_case_id
+    # print(f"DEBUG: Constructed file path: {base_case_path}") # Log file path
     try:
-        # Run subprocess to generate orthoData.json
-        result = subprocess.run(job, capture_output=True, text=True)
-        if result.returncode != 0:
-            print(f"ERROR: Subprocess failed: {result.stderr}")
-            raise HTTPException(status_code=500, detail="Failed to generate orthoData.json")
-        # Read orthoData.json and return its contents
-        if not os.path.isfile(orthoDataFilePath):
-            raise HTTPException(status_code=404, detail="orthoData.json not found")
-        with open(orthoDataFilePath, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return data
+        ortho_case = get_cached_ortho_case(base_case_path)
+        ortho_data = OrthoData(ortho_case)
+        # print(f"DEBUG: Successfully loaded ortho_data for {base_case_id}") # Log success
+        return ortho_data.ortho_data
     except Exception as e:
-        print(f"ERROR: Failed to load orthoData.json for {base_case_id}: {e}") # Log error
+        print(f"ERROR: Failed to load ortho_data for {base_case_id}: {e}") # Log error
         raise HTTPException(status_code=500, detail="Failed to load case data")
 

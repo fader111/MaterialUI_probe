@@ -28,6 +28,17 @@ export function rt(obj_) {
   return { translation: obj_trans, quaternion: obj_quat }
 };
 
+export function transform(rt1, rt2) {
+  // Apply rt2 after rt1: result = rt1 * rt2
+  const t1 = rt1.translation;
+  const q1 = rt1.quaternion;
+  const t2 = rt2.translation;
+  const q2 = rt2.quaternion;
+  const t = t1.clone().add(t2.clone().applyQuaternion(q1));
+  const q = q1.clone().multiply(q2);
+  return { translation: t, quaternion: q };
+}
+
 export function toVec3(obj_) {
   return new THREE.Vector3(parseFloat(obj_.x), parseFloat(obj_.y), parseFloat(obj_.z));
 }
