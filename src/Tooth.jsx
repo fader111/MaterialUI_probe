@@ -89,14 +89,37 @@ export function Tooth(props) {
     else return "white";
   }
 
-  function LandMarkPoint({ lmType, color }) {
-    const lmPoint = landmarks[lmType];
-    return (
-      <mesh position={lmPoint}>
-        <sphereGeometry args={[0.2]} />
-        <meshStandardMaterial color={color} />
-      </mesh>
-    );
+  function LandMark({ lmType, color }) {
+    const lmData = landmarks[lmType];
+    // If it's a line landmark (object with start/end), draw a line
+    if (lmData && lmData.start && lmData.end) {
+      const points = [lmData.start, lmData.end];
+      const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
+      const lineMaterial = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.8 });
+      return (
+        <>
+          <line geometry={lineGeometry} material={lineMaterial} />
+          <mesh position={lmData.start}>
+            <sphereGeometry args={[0.13]} />
+            <meshStandardMaterial color={color} />
+          </mesh>
+          <mesh position={lmData.end}>
+            <sphereGeometry args={[0.13]} />
+            <meshStandardMaterial color={color} />
+          </mesh>
+        </>
+      );
+    }
+    // Otherwise, draw a sphere for point landmark
+    if (lmData) {
+      return (
+        <mesh position={lmData}>
+          <sphereGeometry args={[0.2]} />
+          <meshStandardMaterial color={color} />
+        </mesh>
+      );
+    }
+    return null;
   }
 
   const [meshCenter, setMeshCenter] = useState(new THREE.Vector3());
@@ -159,9 +182,10 @@ export function Tooth(props) {
       <ToothNumberLabel toothID={toothID} />
       {showLandmarks && (
         <>
-          <LandMarkPoint lmType="BCPoint" color="darkorange" />
-          <LandMarkPoint lmType="FEGJPoint" color="brown" />
-          <LandMarkPoint lmType="MRAPoint" color="darkblue" />
+          <LandMark lmType="BCPoint" color="darkorange" />
+          <LandMark lmType="FEGJPoint" color="brown" />
+          <LandMark lmType="MRAPoint" color="darkblue" />
+          <LandMark lmType="MDWLine" color="darkred"       />
         </>
       )}
       {useShortRoots && showLandmarks && landmarks?.MRAPoint && meshCenter && (

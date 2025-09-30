@@ -60,7 +60,7 @@ export default function Ortho(props) {
   // }, [orthoData]);
   // Handle T2Stage updates
   useEffect(() => {
-    // setT2Stage(orthoData && orthoData.Staging && orthoData.Staging.length > 0 ? orthoData.T2Stage -1 : 0)
+    // setT2Stage(orthoData && orthoData.Staging && orthoData.Staging.length > 0 ? orthoData.T2Stage - 1 : 0)
     setT2Stage(orthoData && orthoData.Staging && orthoData.Staging.length > 0 ? parseInt(orthoData.T2Stage) : 0) // !!!!!!!!!!!!!!! NEW !!!!!!!!!!!!!
   }, [orthoData, setT2Stage]);
 

@@ -81,14 +81,24 @@ export const ToothPlacement = forwardRef((props, ref) => {
         if (caseStagingData && stagesNum > 0 ) {
             const landmarksT1_ = {};
             for (const toothID in stagingDataT1.RelativeToothTransforms) {
-                
                 let lmTypes = {};
-                for (const lmType in (stagingDataT1.Landmarks[toothID] || {})) {
-                    const lmPoint = toVec3(stagingDataT1.Landmarks[toothID][lmType])
-                    lmTypes[lmType] = lmPoint;
+                const toothLandmarks = stagingDataT1.Landmarks[toothID] || {};
+                for (const lmType in toothLandmarks) {
+                    if (lmType.endsWith('Point')) {
+                        // Single point landmark
+                        lmTypes[lmType] = toVec3(toothLandmarks[lmType]);
+                    } else if (lmType.endsWith('Line')) {
+                        // Line landmark: store as {start, end}
+                        const line = toothLandmarks[lmType];
+                        lmTypes[lmType] = {
+                            start: toVec3(line.start),
+                            end: toVec3(line.end)
+                        };
+                    }
                 }
                 landmarksT1_[toothID] = lmTypes;
             }
+            // console.log("LandmarksT1_", landmarksT1_["11"]);
             setLandmarksT1(landmarksT1_);
         }
     // }, [caseStagingData, stagingDataT1, mandibulaRt, maxillaRt, stagesNum, orthoData]);
