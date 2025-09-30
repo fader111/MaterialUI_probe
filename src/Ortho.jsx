@@ -60,7 +60,8 @@ export default function Ortho(props) {
   // }, [orthoData]);
   // Handle T2Stage updates
   useEffect(() => {
-    setT2Stage(orthoData && orthoData.Staging && orthoData.Staging.length > 0 ? orthoData.T2Stage -1 : 0)
+    // setT2Stage(orthoData && orthoData.Staging && orthoData.Staging.length > 0 ? orthoData.T2Stage -1 : 0)
+    setT2Stage(orthoData && orthoData.Staging && orthoData.Staging.length > 0 ? parseInt(orthoData.T2Stage) : 0) // !!!!!!!!!!!!!!! NEW !!!!!!!!!!!!!
   }, [orthoData, setT2Stage]);
 
   // задание начальной позиции камеры
@@ -138,10 +139,10 @@ export default function Ortho(props) {
       const StageT2Idx = orthoData.Staging.length - 1; // Last stage is T2
       let template_transforms = {};
       if (t2PredictMode === 'pattern') {
-        template_transforms = orthoData.Staging[StageT2Idx].RelativeToothTransformsHead || {};
+        template_transforms = orthoData.Staging[StageT2Idx].RelativeToothTransforms || {};
       }
       console.log('PredictT2:', { base_case_id, archType, moveType, template_case_id, t2PredictMode, template_transforms });
-      // console.log('Using templateTransforms for T2 prediction:', orthoData.Staging[StageT2Idx].RelativeToothTransformsHead);
+      // console.log('Using templateTransforms for T2 prediction:', orthoData.Staging[StageT2Idx].RelativeToothTransforms);
       const response = await fetch('http://localhost:8000/predict-t2/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -159,9 +160,9 @@ export default function Ortho(props) {
         if (!prev || !prev.Staging) return prev;
         const newOrthoData = { ...prev, Staging: [...prev.Staging] };
         const stageT2Idx = newOrthoData.Staging.length - 1;
-        const newStage = { ...newOrthoData.Staging[stageT2Idx], RelativeToothTransformsHead: { ...newOrthoData.Staging[stageT2Idx].RelativeToothTransformsHead } };
+        const newStage = { ...newOrthoData.Staging[stageT2Idx], RelativeToothTransforms: { ...newOrthoData.Staging[stageT2Idx].RelativeToothTransforms } };
         for (const toothID in prediction) {
-          newStage.RelativeToothTransformsHead[toothID] = prediction[toothID];
+          newStage.RelativeToothTransforms[toothID] = prediction[toothID];
         }
         newOrthoData.Staging[stageT2Idx] = newStage;
         return newOrthoData;
@@ -190,11 +191,12 @@ export default function Ortho(props) {
         if (!prev || !prev.Staging) return prev;
         const newOrthoData = { ...prev, Staging: [...prev.Staging] };
         const stageT2Idx = newOrthoData.Staging.length - 1;
-        const newStage = { ...newOrthoData.Staging[stageT2Idx], RelativeToothTransformsHead: { ...newOrthoData.Staging[stageT2Idx].RelativeToothTransformsHead } };
+        const newStage = { ...newOrthoData.Staging[stageT2Idx], RelativeToothTransforms: { ...newOrthoData.Staging[stageT2Idx].RelativeToothTransforms } };
         for (const toothID in prediction) {
-          newStage.RelativeToothTransformsHead[toothID] = prediction[toothID];
+          newStage.RelativeToothTransforms[toothID] = prediction[toothID];
         }
         newOrthoData.Staging[stageT2Idx] = newStage;
+        // console.log("stageT2Idx", stageT2Idx);
         return newOrthoData;
       });
     } catch (err) {
