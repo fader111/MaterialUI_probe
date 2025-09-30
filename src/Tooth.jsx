@@ -95,7 +95,8 @@ export function Tooth(props) {
     if (lmData && lmData.start && lmData.end) {
       const points = [lmData.start, lmData.end];
       const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
-      const lineMaterial = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.8 });
+      // const lineMaterial = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.8 });
+      const lineMaterial = new THREE.LineBasicMaterial({ color });
       return (
         <>
           <line geometry={lineGeometry} material={lineMaterial} />
