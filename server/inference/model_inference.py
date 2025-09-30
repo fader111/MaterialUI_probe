@@ -139,11 +139,11 @@ class ArchFormRegressor(nn.Module):
         return out.view(-1, self.num_teeth, self.num_points, self.coord_dim)
 
 class OrthoCaseDataLoader:
-    def __init__(self, file_path=""):
+    def __init__(self, file_path="public/orthoData.json"):
         # print(f"os.path.abspath(__file__) {os.path.abspath(__file__)}")
         # print(f"os.path.dirname(os.path.abspath(__file__)) {os.path.dirname(os.path.abspath(__file__))}")
-        file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../public/orthoData.json")
-        with open(file_path, "r", encoding="utf-8") as f:
+        abs_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../", file_path)
+        with open(abs_file_path, "r", encoding="utf-8") as f:
             self.ortho_data = json.load(f)
 
     def get_landmarks(self):
@@ -338,12 +338,15 @@ class OrthoInferencePipeline:
         else:
             template_loader = OrthoCaseDataLoader(template_case_path)
             template_points_t1, template_points_t2 = template_loader.get_landmarks()
-            template_mandible_jaw_rt = template_loader.ortho_case.tp.GetJaw(JawType.Mandible).relativeTransform(0)
-            template_maxilla_jaw_rt = template_loader.ortho_case.tp.GetJaw(JawType.Maxilla).relativeTransform(0)
+            template_mandible_jaw_rt = template_loader.ortho_data.get('mandibularRelativeTransform', None)
+            template_maxilla_jaw_rt = template_loader.ortho_data.get('maxillaRelativeTransform', None)
         
-            # Apply jaw transformations to template point clouds
-            template_points_t1 = self.point_cloud_to_jaw(template_points_t1, template_mandible_jaw_rt, template_maxilla_jaw_rt)
-            template_points_t2 = self.point_cloud_to_jaw(template_points_t2, template_mandible_jaw_rt, template_maxilla_jaw_rt)
+            # No needs???. They're already in jaw (Apply jaw transformations to template point clouds)
+            # template_points_t1 = self.point_cloud_to_jaw(template_points_t1, template_mandible_jaw_rt, template_maxilla_jaw_rt)
+            # template_points_t2 = self.point_cloud_to_jaw(template_points_t2, template_mandible_jaw_rt, template_maxilla_jaw_rt)
+            
+            template_points_t1 = self.point_cloud_to_jaw(template_points_t1, base_mandible_jaw_rt, base_maxilla_jaw_rt)
+            template_points_t2 = self.point_cloud_to_jaw(template_points_t2, base_mandible_jaw_rt, base_maxilla_jaw_rt)
             
             # template_input = template_points_t2 - template_points_t1 # for diff mode
             template_input = template_points_t2

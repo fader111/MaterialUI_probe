@@ -89,7 +89,7 @@ export function Tooth(props) {
     else return "white";
   }
 
-  function LandMark({ lmType, color }) {
+  function LandMarkPoint({ lmType, color }) {
     const lmPoint = landmarks[lmType];
     return (
       <mesh position={lmPoint}>
@@ -159,9 +159,9 @@ export function Tooth(props) {
       <ToothNumberLabel toothID={toothID} />
       {showLandmarks && (
         <>
-          <LandMark lmType="BCPoint" color="darkorange" />
-          <LandMark lmType="FEGJPoint" color="brown" />
-          <LandMark lmType="MRAPoint" color="darkblue" />
+          <LandMarkPoint lmType="BCPoint" color="darkorange" />
+          <LandMarkPoint lmType="FEGJPoint" color="brown" />
+          <LandMarkPoint lmType="MRAPoint" color="darkblue" />
         </>
       )}
       {useShortRoots && showLandmarks && landmarks?.MRAPoint && meshCenter && (

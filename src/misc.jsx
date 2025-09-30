@@ -61,7 +61,8 @@ export function calcLinearStaging(jsonT1Vec3, jsonT2Vec3, stagesNum) {
       const t2Quaternion = jsonT2Vec3[toothID].quaternion.clone();
 
       // Interpolate position and quaternion
-      const t = stage / (stagesNum - 1);
+      // const t = stage / (stagesNum - 1);
+      const t = stage / (stagesNum);
       let position = t1Position.lerp(t2Position, t);
       let quaternion = t1Quaternion.slerp(t2Quaternion, t);
 
