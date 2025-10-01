@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react'
 import './App.css'
 import Ortho from './Ortho'
-
+import { processData } from './misc';
 
 function App() {
   const [orthoData, setOrthoData] = useState(null);
@@ -33,8 +33,9 @@ function App() {
         body: JSON.stringify({ base_case_id })
       });
       if (!response.ok) throw new Error('Failed to reload orthoData');
-      const data = await response.json();
-      // console.log('Reloaded orthoData:', data);
+      const rawData = await response.json();
+      const data = processData(rawData); // transforms tooth to jaw CS
+      console.log('Reloaded orthoData:', data);
       setOrthoData(data);
       setBaseCaseFilename(base_case_id);
       setIsFileLoaded(true);

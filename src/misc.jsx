@@ -3,6 +3,91 @@ import * as THREE from 'three'
 // import { useThree } from '@react-three/fiber'
 // import { AsciiEffect } from 'three/examples/jsm/Addons.js';
 
+export function processData(data) {
+  // Convert tooth transforms from local CS to jaws CS using jaw transforms from data
+  if (!data || !data.Staging) return data;
+
+  // Helper: parse all coordinates to float
+  function parseVec3(obj) {
+    return {
+      x: parseFloat(obj.x),
+      y: parseFloat(obj.y),
+      z: parseFloat(obj.z)
+    };
+  }
+  function parseQuat(obj) {
+    return {
+      x: parseFloat(obj.x),
+      y: parseFloat(obj.y),
+      z: parseFloat(obj.z),
+      w: parseFloat(obj.w)
+    };
+  }
+
+  // Helper: quaternion multiplication
+  function multiplyQuat(q1, q2) {
+    return {
+      w: q1.w*q2.w - q1.x*q2.x - q1.y*q2.y - q1.z*q2.z,
+      x: q1.w*q2.x + q1.x*q2.w + q1.y*q2.z - q1.z*q2.y,
+      y: q1.w*q2.y - q1.x*q2.z + q1.y*q2.w + q1.z*q2.x,
+      z: q1.w*q2.z + q1.x*q2.y - q1.y*q2.x + q1.z*q2.w
+    };
+  }
+
+  // Helper: apply quaternion to vector
+  function applyQuatToVec3(q, v) {
+    const vq = {x: v.x, y: v.y, z: v.z, w: 0};
+    const qInv = {x: -q.x, y: -q.y, z: -q.z, w: q.w};
+    const qv = multiplyQuat(q, vq);
+    const result = multiplyQuat(qv, qInv);
+    return {x: result.x, y: result.y, z: result.z};
+  }
+
+  // Compose jaw transform with tooth transform
+  function composeJawTooth(jaw, tooth) {
+    // translation: t_jaw + applyQuatToVec3(q_jaw, t_tooth)
+    // rotation: q_jaw * q_tooth
+    const t_jaw = parseVec3(jaw.translation);
+    const q_jaw = parseQuat(jaw.rotation);
+    const t_tooth = parseVec3(tooth.translation);
+    const q_tooth = parseQuat(tooth.rotation);
+    const t_applied = applyQuatToVec3(q_jaw, t_tooth);
+    const t = {
+      x: t_jaw.x + t_applied.x,
+      y: t_jaw.y + t_applied.y,
+      z: t_jaw.z + t_applied.z
+    };
+    const q = multiplyQuat(q_jaw, q_tooth);
+    return { translation: t, rotation: q };
+  }
+
+  const newData = { ...data, Staging: data.Staging.map(stageObj => {
+    const newStage = { ...stageObj, RelativeToothTransforms: { ...stageObj.RelativeToothTransforms } };
+    for (const toothID in newStage.RelativeToothTransforms) {
+      const toothRT = newStage.RelativeToothTransforms[toothID];
+      const jawRT = (parseInt(toothID) < 30)
+        ? data.mandibularRelativeTransform
+        : data.maxillaRelativeTransform;
+      const worldRT = composeJawTooth(jawRT, toothRT);
+      newStage.RelativeToothTransforms[toothID] = {
+        translation: {
+          x: worldRT.translation.x,
+          y: worldRT.translation.y,
+          z: worldRT.translation.z
+        },
+        rotation: {
+          x: worldRT.rotation.x,
+          y: worldRT.rotation.y,
+          z: worldRT.rotation.z,
+          w: worldRT.rotation.w
+        }
+      };
+    }
+    return newStage;
+  })};
+  return newData;
+}
+
 // Rigid Transforms as a Translation + Quaternion
 export function rt(obj_) {
   if (!obj_ || !obj_.translation || !obj_.rotation ||

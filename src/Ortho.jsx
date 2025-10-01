@@ -6,6 +6,7 @@ import CombinedTransformControls from './CombinedTransformControls'
 // import NativeCombinedTransformControls from './NativeCombinedTransformControls'
 import { ToothPlacement } from './ToothPlacement';
 import Overlay from './Overlay';
+import { rt, transform} from "./misc";
 
 function CameraFollowingLight({ camera }) {
   const lightRef = useRef()
@@ -138,7 +139,7 @@ export default function Ortho(props) {
       const template_case_id = `templates/${arch}_${molar}`;
       const StageT2Idx = orthoData.Staging.length - 1; // Last stage is T2
       let template_transforms = {};
-      if (t2PredictMode === 'pattern') {
+      if (t2PredictMode === 'pattern') { // based on manual pattern
         template_transforms = orthoData.Staging[StageT2Idx].RelativeToothTransforms || {};
       }
       console.log('PredictT2:', { base_case_id, archType, moveType, template_case_id, t2PredictMode, template_transforms });

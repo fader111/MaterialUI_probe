@@ -48,6 +48,7 @@ export const ToothPlacement = forwardRef((props, ref) => {
     const stagingDataT2 = caseStagingData && stagesNum > 0 ? caseStagingData[stagesNum - 1] : null;
 
     const { jsonT1Vec3, jsonT2Vec3, jsonStageVec3 } = useMemo(() => {
+        // console.log("call useMemo for jsonVec3");
         let stageVec3 = {};
         let t1Vec3 = {};
         let t2Vec3 = {};
@@ -55,11 +56,15 @@ export const ToothPlacement = forwardRef((props, ref) => {
         if (caseStagingData && stagesNum > 0) {
             for (const toothID in stagingDataT2.RelativeToothTransforms) {
                 
-                const jawRT = (parseInt(toothID) < 30 ) ? mandibularRT : maxillaRT;
-                const toothRt = transform(jawRT, rt(caseStagingData[stage]?.RelativeToothTransforms?.[toothID]));
-                const toothRtT1 = transform(jawRT, rt(stagingDataT1.RelativeToothTransforms[toothID]));
-                const toothRtT2 = transform(jawRT, rt(stagingDataT2.RelativeToothTransforms[toothID]));
+                // const jawRT = (parseInt(toothID) < 30 ) ? mandibularRT : maxillaRT;
+                // const toothRt = transform(jawRT, rt(caseStagingData[stage]?.RelativeToothTransforms?.[toothID]));
+                // const toothRtT1 = transform(jawRT, rt(stagingDataT1.RelativeToothTransforms[toothID]));
+                // const toothRtT2 = transform(jawRT, rt(stagingDataT2.RelativeToothTransforms[toothID]));
 
+                const toothRt = rt(caseStagingData[stage]?.RelativeToothTransforms?.[toothID]);
+                const toothRtT1 = rt(stagingDataT1.RelativeToothTransforms[toothID]);
+                const toothRtT2 = rt(stagingDataT2.RelativeToothTransforms[toothID]);
+                
                 stageVec3[toothID] = {
                     position: toothRt.translation,
                     quaternion: toothRt.quaternion

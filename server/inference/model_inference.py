@@ -223,11 +223,10 @@ class OrthoInferencePipeline:
         return transforms_dict
         
     def _compose_transforms_to_jaw(self, transforms_dict: Dict[str, Dict[str, Any]], mandible_rt, maxillary_rt) -> Dict[str, Dict[str, Any]]:
-        
-        mandible_jaw_translation = translate_from_ormco(mandible_rt)
-        mandible_jaw_quaternion = quaternion_from_ormco(mandible_rt)
-        maxilla_jaw_translation = translate_from_ormco(maxillary_rt)
-        maxilla_jaw_quaternion = quaternion_from_ormco(maxillary_rt)
+        mandible_jaw_translation = translate(mandible_rt)
+        mandible_jaw_quaternion = quaternion(mandible_rt)
+        maxilla_jaw_translation = translate(maxillary_rt)
+        maxilla_jaw_quaternion = quaternion(maxillary_rt)
 
         for tooth_id, tf in transforms_dict.items():
             try:
@@ -235,15 +234,32 @@ class OrthoInferencePipeline:
             except Exception:
                 continue
             # Determine if the tooth is in the mandible or maxilla
-            # Q - how to use Py_isLower here?
             jaw_translation = mandible_jaw_translation if tid > 30 else maxilla_jaw_translation
             jaw_quaternion = mandible_jaw_quaternion if tid > 30 else maxilla_jaw_quaternion
 
-            # Apply jaw rotation to tooth translation
-            t_vec = np.array([tf["translation"]["x"], tf["translation"]["y"], tf["translation"]["z"]])
-            q_quat = [tf["rotation"]["x"], tf["rotation"]["y"], tf["rotation"]["z"], tf["rotation"]["w"]]
-            jt_vec = np.array([jaw_translation[0], jaw_translation[1], jaw_translation[2]])
-            jq_quat = [jaw_quaternion[0], jaw_quaternion[1], jaw_quaternion[2], jaw_quaternion[3]]
+            # Ensure all values are float before creating numpy arrays
+            t_vec = np.array([
+                float(tf["translation"]["x"]),
+                float(tf["translation"]["y"]),
+                float(tf["translation"]["z"])
+            ])
+            q_quat = [
+                float(tf["rotation"]["x"]),
+                float(tf["rotation"]["y"]),
+                float(tf["rotation"]["z"]),
+                float(tf["rotation"]["w"])
+            ]
+            jt_vec = np.array([
+                float(jaw_translation[0]),
+                float(jaw_translation[1]),
+                float(jaw_translation[2])
+            ])
+            jq_quat = [
+                float(jaw_quaternion[0]),
+                float(jaw_quaternion[1]),
+                float(jaw_quaternion[2]),
+                float(jaw_quaternion[3])
+            ]
             t_rot = R.from_quat(jq_quat).apply(t_vec)
             final_translation = t_rot + jt_vec
             final_quat = R.from_quat(jq_quat) * R.from_quat(q_quat)
@@ -332,7 +348,7 @@ class OrthoInferencePipeline:
             template_points_t2_front = self.apply_transform_to_point_cloud(base_case_points_origins, template_transforms)
             # show_2_cloud_points_in_pv(base_case_points_t1, template_points_t2_front, title="t1_ (red) Transformed T2 (blue)")
             
-            # template_input = template_points_t2_front - base_case_points_t1 # for diff mode
+            # template_diff = template_points_t2_front - base_case_points_t1 # for diff mode
             template_input = template_points_t2_front
             template_points_t2 = None # stub
         else:
@@ -379,7 +395,7 @@ class OrthoInferencePipeline:
         transforms_dict = self._compose_transforms_from_points(base_loader, init_prediction_points, base_case_points_t1)
 
         # transform to Head coordinates !!!!!!!!!!!!!!!!!!!!! выключил вчера. проверять как это работатет !!!!!!!!!!!!!!!!!!!!!!!!!!
-        # transforms_dict = self._compose_transforms_to_jaw(transforms_dict, base_mandible_jaw_rt, base_maxilla_jaw_rt)
+        transforms_dict = self._compose_transforms_to_jaw(transforms_dict, base_mandible_jaw_rt, base_maxilla_jaw_rt)
         print(f"Init inference done (class pipeline)")
         return transforms_dict
 
