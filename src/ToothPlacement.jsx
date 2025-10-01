@@ -134,27 +134,67 @@ export const ToothPlacement = forwardRef((props, ref) => {
 
     let stagingData = stagingDataSelector[stagingType] || {};
 
+    // const handleToothTransformControl_ = useCallback((toothId, transforms) => {
+    //     console.log("handleToothTransformControl called for toothId:", toothId, "with transforms:", transforms);
+    //     if (orthoData?.Staging && orthoData.Staging[stage]) {
+    //         // Use rt from misc to convert transforms to translation/quaternion
+    //         const { translation, quaternion } = rt(transforms);
+    //         // Determine jawRT and its inverse for this tooth
+    //         const jawRT = (parseInt(toothId) < 30) ? rt(orthoData?.mandibularRelativeTransform || null) : rt(orthoData?.maxillaRelativeTransform || null);
+    //         // Convert world transform to jaw coordinate system
+    //         // Inverse jawRT: T_jaw = jawRT^-1 * T_world
+    //         const invJawQuat = jawRT.quaternion.clone().invert();
+    //         const invJawTrans = jawRT.translation.clone().negate().applyQuaternion(invJawQuat);
+    //         // Transform translation
+    //         const jawTranslation = translation.clone().sub(jawRT.translation).applyQuaternion(invJawQuat);
+    //         const translationObj = { x: jawTranslation.x, y: jawTranslation.y, z: jawTranslation.z };
+    //         // Transform rotation
+    //         const jawQuaternion = invJawQuat.clone().multiply(quaternion.clone());
+    //         const rotationObj = {
+    //             x: jawQuaternion.x,
+    //             y: jawQuaternion.y,
+    //             z: jawQuaternion.z,
+    //             w: jawQuaternion.w
+    //         };
+    //         setOrthoData(prev => {
+    //             if (!prev || !prev.Staging) return prev;
+    //             const newOrthoData = { ...prev, Staging: [...prev.Staging] };
+    //             const newStage = { ...newOrthoData.Staging[stage], RelativeToothTransforms: { ...newOrthoData.Staging[stage].RelativeToothTransforms } };
+    //             newStage.RelativeToothTransforms[toothId] = {
+    //                 ...newStage.RelativeToothTransforms[toothId],
+    //                 translation: translationObj,
+    //                 rotation: rotationObj
+    //             };
+    //             newOrthoData.Staging[stage] = newStage;
+    //             return newOrthoData;
+    //         });
+    //     }
+    // // }, [orthoData, stage, setOrthoData]);
+    // }, []);
+
+        // handke 
     const handleToothTransformControl = useCallback((toothId, transforms) => {
         console.log("handleToothTransformControl called for toothId:", toothId, "with transforms:", transforms);
         if (orthoData?.Staging && orthoData.Staging[stage]) {
-            // Use rt from misc to convert transforms to translation/quaternion
-            const { translation, quaternion } = rt(transforms);
-            // Determine jawRT and its inverse for this tooth
-            const jawRT = (parseInt(toothId) < 30) ? rt(orthoData?.mandibularRelativeTransform || null) : rt(orthoData?.maxillaRelativeTransform || null);
-            // Convert world transform to jaw coordinate system
-            // Inverse jawRT: T_jaw = jawRT^-1 * T_world
-            const invJawQuat = jawRT.quaternion.clone().invert();
-            const invJawTrans = jawRT.translation.clone().negate().applyQuaternion(invJawQuat);
-            // Transform translation
-            const jawTranslation = translation.clone().sub(jawRT.translation).applyQuaternion(invJawQuat);
-            const translationObj = { x: jawTranslation.x, y: jawTranslation.y, z: jawTranslation.z };
-            // Transform rotation
-            const jawQuaternion = invJawQuat.clone().multiply(quaternion.clone());
-            const rotationObj = {
-                x: jawQuaternion.x,
-                y: jawQuaternion.y,
-                z: jawQuaternion.z,
-                w: jawQuaternion.w
+            const localTranslation = transforms.translation;
+            const localRotation = new THREE.Quaternion(
+                transforms.rotation.x,
+                transforms.rotation.y,
+                transforms.rotation.z,
+                transforms.rotation.w
+            );
+            // Ensure translation is always a plain object !!! Refactor that!!!!
+            const translationObj = (localTranslation instanceof THREE.Vector3)
+                ? { x: localTranslation.x, y: localTranslation.y, z: localTranslation.z }
+                : localTranslation;
+            const localTransforms = {
+                translation: translationObj,
+                rotation: {
+                    x: localRotation.x,
+                    y: localRotation.y,
+                    z: localRotation.z,
+                    w: localRotation.w
+                }
             };
             setOrthoData(prev => {
                 if (!prev || !prev.Staging) return prev;
@@ -162,13 +202,14 @@ export const ToothPlacement = forwardRef((props, ref) => {
                 const newStage = { ...newOrthoData.Staging[stage], RelativeToothTransforms: { ...newOrthoData.Staging[stage].RelativeToothTransforms } };
                 newStage.RelativeToothTransforms[toothId] = {
                     ...newStage.RelativeToothTransforms[toothId],
-                    translation: translationObj,
-                    rotation: rotationObj
+                    translation: localTransforms.translation,
+                    rotation: localTransforms.rotation
                 };
                 newOrthoData.Staging[stage] = newStage;
                 return newOrthoData;
             });
         }
+    // }, [orthoData, stage, mandibulaRt, maxillaRt, setOrthoData]);
     }, [orthoData, stage, setOrthoData]);
 
     // Local state for showMode if not controlled
