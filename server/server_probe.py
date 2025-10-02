@@ -7,8 +7,8 @@ import subprocess
 import os
 import time
 
-base_case_id = "100310"
 base_case_id = "00000000"
+base_case_id = "100310"
 
 EXE_PATH = r"E:\WebGLServer\orthoplatform\Build\windows-msbuild-cl\Bin\OASDatabase\Release\OASDatabase.exe"
 OAS_DIR = os.path.join(os.path.dirname(__file__), "./")
@@ -34,6 +34,9 @@ def run_oasdatabase(command_args):
     # print(f"Output: {result.stdout}")
     # print(f"Error: {result.stderr}")
 
+def run_job(job):
+    return subprocess.run(job, capture_output=True, text=True)
+    
 if __name__ == "__main__":
     # Example parameter sets (customize as needed)
     testDirDataExport = r"E:\outSurfs"
@@ -73,5 +76,12 @@ if __name__ == "__main__":
         run_oasdatabase(job)
     seq_end_time = time.time()
     print(f"Total execution time sequential for case {base_case_id} : {seq_end_time - seq_start_time:.2f} seconds")
+
+    # Pool-based parallel execution for comparison
+    pool_start_time = time.time()
+    with multiprocessing.Pool(processes=len(jobs)) as pool:
+        results = pool.map(run_job, jobs)
+    pool_end_time = time.time()
+    print(f"Total execution time multiprocessing.Pool for case {base_case_id} : {pool_end_time - pool_start_time:.2f} seconds")
 
 
