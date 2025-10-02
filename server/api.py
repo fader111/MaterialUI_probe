@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -17,8 +17,9 @@ import json
 # from server.ortho_data import OrthoData
 from typing import List, Dict, Any
 import numpy as np
-from starlette.concurrency import run_in_threadpool
-from concurrent.futures import ThreadPoolExecutor
+# from starlette.concurrency import run_in_threadpool
+# from concurrent.futures import ThreadPoolExecutor
+import multiprocessing
 from scipy.spatial.transform import Rotation as R
 
 app = FastAPI()
@@ -40,10 +41,18 @@ MESH_DIR = os.path.join(os.path.dirname(__file__), "../public/meshes/")
 ROOTS_DIR = os.path.join(os.path.dirname(__file__), "../public/roots/")
 SHORTROOTS_DIR = os.path.join(os.path.dirname(__file__), "../public/shortRoots/")
 
-# ortho_case_cache = {
-#     "file_path": None,
-#     "ortho_case": None
-# }
+# Top-level function for multiprocessing
+def run_and_store(idx, job, ret_dict):
+    result = subprocess.run(job, capture_output=True, text=True)
+    ret_dict[idx] = {
+        'stdout': result.stdout,
+        'stderr': result.stderr,
+        'returncode': result.returncode
+    }
+
+# Top-level function for multiprocessing
+def run_job(job):
+    return subprocess.run(job, capture_output=True, text=True)
 
 class ExportTeethRequest(BaseModel):
     filename: str
@@ -55,61 +64,53 @@ def upload_oas_file(file: UploadFile = File(...)):
         shutil.copyfileobj(file.file, buffer)
     return {"filename": file.filename}
 
-@app.post("/export-teeth/")
+@app.post("/export-teeth-and-data/")
 def export_teeth(request: ExportTeethRequest):
     filename = request.filename
     oas_path = os.path.join(OAS_DIR, filename)
     print(f"oas_path {oas_path}")
     if not os.path.isfile(oas_path):
         raise HTTPException(status_code=404, detail="OAS file not found")
-    job = [
-        EXE_PATH,
-        "ExportTeethSurfaces",
-        oas_path,
-        PUBLIC_DIR
+    orthoDataFilePath = os.path.join(PUBLIC_DIR, "orthoData.json")
+    jobs = [
+        [
+            EXE_PATH,
+            "ExportTeethSurfaces",
+            oas_path,
+            PUBLIC_DIR
+        ],
+        [
+            EXE_PATH,
+            "ExportStagingData",
+            oas_path,
+            orthoDataFilePath
+        ]
     ]
 
-    result = subprocess.run(
-        # command_args,
-        job,
-        capture_output=True,
-        text=True,
-        # stdout=subprocess.DEVNULL,   # Suppress stdout
-        # stderr=subprocess.DEVNULL    # Suppress stderr (optional)
-    )
-    if result.returncode != 0:
-        return JSONResponse(status_code=500, content={"error": result.stderr})
-    return {"status": "ok", "output": result.stdout}
+    with multiprocessing.Pool(processes=2) as pool:
+        results = pool.map(run_job, jobs)
+
+    errors = [r.stderr for r in results if r.returncode != 0]
+    if errors:
+        return JSONResponse(status_code=500, content={"error": "\n".join(errors)})
+    return {"status": "ok", "output": [r.stdout for r in results]}
 
 @app.post("/get_case_data/")
 async def get_case_data(base_case_id: str = Body(..., embed=True)):
     """
     Returns case data including staging and tooth transforms.
     Accepts: { base_case_id: str }
-    Now runs subprocess to generate orthoData.json, reads it, and returns its contents.
+    Reads orthoData.json and returns its contents (does not generate it).
     """
-    oas_path = os.path.join(OAS_DIR, f"{base_case_id}.oas")
     orthoDataFilePath = os.path.join(PUBLIC_DIR, "orthoData.json")
-    job = [
-        EXE_PATH,
-        "ExportStagingData",
-        oas_path,
-        orthoDataFilePath
-    ]
+    if not os.path.isfile(orthoDataFilePath):
+        raise HTTPException(status_code=404, detail="orthoData.json not found")
     try:
-        # Run subprocess to generate orthoData.json
-        result = subprocess.run(job, capture_output=True, text=True)
-        if result.returncode != 0:
-            print(f"ERROR: Subprocess failed: {result.stderr}")
-            raise HTTPException(status_code=500, detail="Failed to generate orthoData.json")
-        # Read orthoData.json and return its contents
-        if not os.path.isfile(orthoDataFilePath):
-            raise HTTPException(status_code=404, detail="orthoData.json not found")
         with open(orthoDataFilePath, "r", encoding="utf-8") as f:
             data = json.load(f)
         return data
     except Exception as e:
-        print(f"ERROR: Failed to load orthoData.json for {base_case_id}: {e}") # Log error
+        print(f"ERROR: Failed to load orthoData.json: {e}")
         raise HTTPException(status_code=500, detail="Failed to load case data")
 
 @app.post("/predict-t2/")

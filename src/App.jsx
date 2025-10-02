@@ -35,7 +35,7 @@ function App() {
       if (!response.ok) throw new Error('Failed to reload orthoData');
       const rawData = await response.json();
       const data = processData(rawData); // transforms tooth to jaw CS
-      console.log('Reloaded orthoData:', data);
+      // console.log('Reloaded orthoData:', data);
       setOrthoData(data);
       setBaseCaseFilename(base_case_id);
       setIsFileLoaded(true);

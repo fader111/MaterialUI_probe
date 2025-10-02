@@ -1,6 +1,7 @@
 // src/api/exportTeeth.js
 export async function exportTeeth(oasFilename) {
-  const response = await fetch('http://localhost:8000/export-teeth/', {
+  console.log('exportTeeth called with filename:', oasFilename);
+  const response = await fetch('http://localhost:8000/export-teeth-and-data/', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ filename: oasFilename })
