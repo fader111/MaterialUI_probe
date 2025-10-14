@@ -8,6 +8,7 @@ import MenuItem from '@mui/material/MenuItem'
 import Button from '@mui/material/Button'
 import Divider from '@mui/material/Divider'
 import RotateLeftIcon from '@mui/icons-material/RotateLeft'
+import RotateRightIcon from '@mui/icons-material/RotateRight'
 import ShuffleIcon from '@mui/icons-material/Shuffle'
 import RestartAltIcon from '@mui/icons-material/RestartAlt'
 import SaveAltIcon from '@mui/icons-material/SaveAlt'
@@ -18,6 +19,8 @@ import IconButton from '@mui/material/IconButton'
 import ArrowLeftIcon from '@mui/icons-material/ArrowLeft'
 import ArrowRightIcon from '@mui/icons-material/ArrowRight'
 import { useState } from 'react';
+import CommandManager from './undo/CommandManager'
+import { sceneApi } from './undo/sceneApi'
 
 function MenuBar({ onFileLoaded }) {
   const [anchorEls, setAnchorEls] = React.useState({})
@@ -240,6 +243,9 @@ export default function Overlay({ children, stage, maxStage, onStageChange, onVi
   const [status, setStatus] = React.useState(() => localStorage.getItem('status') || '');
   const [loading, setLoading] = React.useState(false);
   const loadingRef = React.useRef(false);
+  // Command manager for undo/redo (standalone)
+  const cmdManagerRef = React.useRef(null)
+  const [historyTick, setHistoryTick] = React.useState(0)
 
   // Listen for mesh/data reload completion from Ortho
   React.useEffect(() => {
@@ -258,6 +264,35 @@ export default function Overlay({ children, stage, maxStage, onStageChange, onVi
   React.useEffect(() => {
     setStatus(localStorage.getItem('status') || '');
   }, []);
+
+  // Initialize command manager and keyboard shortcuts (Ctrl/Cmd+Z, Ctrl+Y / Ctrl+Shift+Z)
+  React.useEffect(() => {
+    if (!cmdManagerRef.current) {
+      cmdManagerRef.current = new CommandManager(500)
+      cmdManagerRef.current.setObserver(() => setHistoryTick((t) => t + 1))
+      // Expose for quick debugging in console
+      try { window.commandManager = cmdManagerRef.current } catch (e) { /* ignore */ }
+    }
+
+    const onKeyDown = (e) => {
+      const isMac = navigator.platform && navigator.platform.toUpperCase().indexOf('MAC') >= 0
+      const mod = isMac ? e.metaKey : e.ctrlKey
+      if (!mod) return
+      // Undo: Ctrl/Cmd + Z (without Shift)
+      if (e.key.toLowerCase() === 'z' && !e.shiftKey) {
+        e.preventDefault()
+        cmdManagerRef.current && cmdManagerRef.current.undo()
+      }
+      // Redo: Ctrl/Cmd + Shift + Z  OR Ctrl/Cmd + Y
+      if ((e.key.toLowerCase() === 'z' && e.shiftKey) || e.key.toLowerCase() === 'y') {
+        e.preventDefault()
+        cmdManagerRef.current && cmdManagerRef.current.redo()
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
 
   // Pattern selection state
   // archType, setArchType, moveType, setMoveType, t2PredictMode, setT2PredictMode are now controlled from parent (Ortho)
@@ -436,7 +471,27 @@ export default function Overlay({ children, stage, maxStage, onStageChange, onVi
       {/* Status bar */}
       <Box sx={{ position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 3, height: 32, bgcolor: 'rgba(240,240,240,0.95)', borderTop: '1px solid #ccc', display: 'flex', alignItems: 'center', px: 2, fontSize: 15, color: '#333', pointerEvents: 'auto' }}>
         <span style={{ fontWeight: 500, marginRight: 16 }}>File: {baseCaseFilename+".oas" || 'None'}</span>
-        <span>Status: {loading || status === 'Loading...' ? 'Loading...' : (status || 'Ready')}</span>
+        <span style={{ marginRight: 12 }}>Status: {loading || status === 'Loading...' ? 'Loading...' : (status || 'Ready')}</span>
+        <Box sx={{ ml: 'auto', display: 'flex', gap: 1, alignItems: 'center' }}>
+          <IconButton
+            size="small"
+            title="Undo (Ctrl/Cmd+Z)"
+            onClick={() => cmdManagerRef.current && cmdManagerRef.current.undo()}
+            disabled={!cmdManagerRef.current || !cmdManagerRef.current.canUndo()}
+            sx={{ border: 'none', outline: 'none', boxShadow: 'none', '&:focus': { border: 'none', outline: 'none' }, '&:active': { border: 'none', outline: 'none' } }}
+          >
+            <RotateLeftIcon />
+          </IconButton>
+          <IconButton
+            size="small"
+            title="Redo (Ctrl/Cmd+Y / Ctrl/Cmd+Shift+Z)"
+            onClick={() => cmdManagerRef.current && cmdManagerRef.current.redo()}
+            disabled={!cmdManagerRef.current || !cmdManagerRef.current.canRedo()}
+            sx={{ border: 'none', outline: 'none', boxShadow: 'none', '&:focus': { border: 'none', outline: 'none' }, '&:active': { border: 'none', outline: 'none' } }}
+          >
+            <RotateRightIcon />
+          </IconButton>
+        </Box>
       </Box>
     </Box>
   )

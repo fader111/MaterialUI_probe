@@ -244,6 +244,7 @@ export const ToothPlacement = forwardRef((props, ref) => {
                         trackballControlsRef={trackballControlsRef}
                         setControlsEnabled={setControlsEnabled}
                         stage={stage}
+                        setOrthoData={setOrthoData}
                         stagingData={currentStageData[toothID]}
                         landmarks={landmarksT1 ? landmarksT1[toothID] : {}}
                         url={`/meshes/${toothID}.stl?ts=${props.meshVersion}`}

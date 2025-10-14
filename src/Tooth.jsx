@@ -1,4 +1,8 @@
 import React from 'react';
+import TransformCommand from './undo/TransformCommand';
+import { sceneApi } from './undo/sceneApi';
+// Access the global command manager (created in Overlay)
+const getCommandManager = () => window.commandManager;
 import { useLoader, useFrame } from '@react-three/fiber';
 import { TransformControls, Html, Text } from '@react-three/drei';
 // import { Html, Text } from '@react-three/drei';
@@ -200,6 +204,7 @@ export function Tooth(props) {
 
   const [isDragging, setIsDragging] = useState(false);
   const [initialTransform, setInitialTransform] = useState(null);
+  const commandRef = useRef(null);
   
   useEffect(() => {
     if (isClicked && toothRef.current) {
@@ -215,38 +220,77 @@ export function Tooth(props) {
       trackballControlsRef.current.enabled = false;
       setIsDragging(true);
     }
-  }, [trackballControlsRef]);
+    // Capture before snapshot and create command
+    if (toothRef.current) {
+      const before = {
+        position: toothRef.current.position.clone(),
+        quaternion: toothRef.current.quaternion.clone(),
+      };
+      // setOrthoData and stage are passed via props (from ToothPlacement)
+      commandRef.current = new TransformCommand(
+        toothID,
+        { [toothID]: {
+          position: before.position.toArray(),
+          quaternion: before.quaternion.toArray(),
+        } },
+        { [toothID]: {
+          position: before.position.toArray(),
+          quaternion: before.quaternion.toArray(),
+        } },
+        sceneApi,
+        props.setOrthoData,
+        props.stage
+      );
+    }
+  }, [trackballControlsRef, toothID, props.setOrthoData, props.stage]);
   // }, []);
 
   const handleTransformEnd = useCallback(() => {
     if (trackballControlsRef?.current) {
       trackballControlsRef.current.enabled = true;
       setIsDragging(false);
-      // console.log("end drag")
     }
-    if (toothRef.current && initialTransform) {
+    if (toothRef.current && commandRef.current) {
+      // Set after snapshot
+      commandRef.current.after[toothID] = {
+        position: toothRef.current.position.toArray(),
+        quaternion: toothRef.current.quaternion.toArray(),
+      };
+      // Execute command (push to undo stack)
+      const manager = getCommandManager();
+      if (manager) manager.execute(commandRef.current);
+      commandRef.current = null;
+    }
+    // Optionally still call onTransform for app state
+    if (toothRef.current) {
       const newTransforms = {
         translation: toothRef.current.position.clone(),
         rotation: toothRef.current.quaternion.clone()
       };
       onTransform(toothID, newTransforms);
-      console.log("end drag 2 part")
     }
-  }, [trackballControlsRef, initialTransform]);
+  }, [trackballControlsRef, toothID, onTransform]);
   // }, []);
 
 
 
   const handleObjectChange = useCallback(() => {
-    if (toothRef.current && initialTransform) {
+    if (toothRef.current && commandRef.current) {
+      // Update after snapshot live during drag
+      commandRef.current.after[toothID] = {
+        position: toothRef.current.position.toArray(),
+        quaternion: toothRef.current.quaternion.toArray(),
+      };
+    }
+    // Optionally still call onTransform for app state
+    if (toothRef.current) {
       const newTransforms = {
         translation: toothRef.current.position.clone(),
         rotation: toothRef.current.quaternion.clone()
       };
       onTransform(toothID, newTransforms);
-      console.log("from handleObjectChange")
     }
-  }, [toothID, onTransform, initialTransform, isDragging]);
+  }, [toothID, onTransform]);
   // }, []);
 
   const TransformHint = () => (
@@ -310,7 +354,7 @@ export function Tooth(props) {
             // lineWidth={9} // Это не катит - надо форкать и менять контрол или использовать THREE вариант
             onMouseDown={handleTransformStart}
             onMouseUp={handleTransformEnd}
-            // onObjectChange={handleObjectChange}
+            onObjectChange={handleObjectChange}
             onPointerDown={(e) => e.stopPropagation()}
             onPointerUp={(e) => e.stopPropagation()}
             onPointerMove={(e) => e.stopPropagation()}

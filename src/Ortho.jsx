@@ -7,6 +7,7 @@ import CombinedTransformControls from './CombinedTransformControls'
 import { ToothPlacement } from './ToothPlacement';
 import Overlay from './Overlay';
 import { rt, transform} from "./misc";
+import PredictCommand from './undo/PredictCommand';
 
 function CameraFollowingLight({ camera }) {
   const lightRef = useRef()
@@ -126,39 +127,30 @@ export default function Ortho(props) {
   
   // Handler for T2 prediction (refactored to update orthoData.Staging)
   const handlePredictT2 = useCallback(async () => {
-    // console.log("handlePredictT2 called");
     if (!orthoData || !orthoData.Staging || orthoData.Staging.length === 0) {
       console.error("handlePredictT2: orthoData or orthoData.Staging is null/empty");
       return;
     }
     try {
       const base_case_id = baseCaseFilename || '00000000';
-      // Build template_case_id dynamically
       let arch = archType.toLowerCase();
       let molar = moveType === 'Class II' ? 'class2' : 'class1';
       const template_case_id = `templates/${arch}_${molar}`;
-      const StageT2Idx = orthoData.Staging.length - 1; // Last stage is T2
+      const StageT2Idx = orthoData.Staging.length - 1;
       let template_transforms = {};
-      if (t2PredictMode === 'pattern') { // based on manual pattern
+      if (t2PredictMode === 'pattern') {
         template_transforms = orthoData.Staging[StageT2Idx].RelativeToothTransforms || {};
       }
-      console.log('PredictT2:', { base_case_id, archType, moveType, template_case_id, t2PredictMode, template_transforms });
-      // console.log('Using templateTransforms for T2 prediction:', orthoData.Staging[StageT2Idx].RelativeToothTransforms);
       const response = await fetch('http://localhost:8000/predict-t2/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          base_case_id, 
-          template_case_id, 
-          template_transforms
-        })
+        body: JSON.stringify({ base_case_id, template_case_id, template_transforms })
       });
-      if (!response.ok) {
-        throw new Error('Prediction failed');
-      }
+      if (!response.ok) throw new Error('Prediction failed');
       const prediction = await response.json();
       setOrthoData(prev => {
         if (!prev || !prev.Staging) return prev;
+        const before = JSON.parse(JSON.stringify(prev));
         const newOrthoData = { ...prev, Staging: [...prev.Staging] };
         const stageT2Idx = newOrthoData.Staging.length - 1;
         const newStage = { ...newOrthoData.Staging[stageT2Idx], RelativeToothTransforms: { ...newOrthoData.Staging[stageT2Idx].RelativeToothTransforms } };
@@ -166,6 +158,11 @@ export default function Ortho(props) {
           newStage.RelativeToothTransforms[toothID] = prediction[toothID];
         }
         newOrthoData.Staging[stageT2Idx] = newStage;
+        setTimeout(() => {
+          if (window.commandManager) {
+            window.commandManager.execute(new PredictCommand(before, newOrthoData, setOrthoData));
+          }
+        }, 0);
         return newOrthoData;
       });
     } catch (err) {
@@ -175,7 +172,6 @@ export default function Ortho(props) {
 
   // Handler for Init Predict (now updates orthoData.Staging like handlePredictT2)
   const handlePredictInit = useCallback(async () => {
-    console.log("handlePredictInit called");
     if (!baseCaseFilename) {
       console.error('handlePredictInit called without baseCaseFilename!');
       return;
@@ -190,6 +186,7 @@ export default function Ortho(props) {
       const prediction = await resp.json();
       setOrthoData(prev => {
         if (!prev || !prev.Staging) return prev;
+        const before = JSON.parse(JSON.stringify(prev));
         const newOrthoData = { ...prev, Staging: [...prev.Staging] };
         const stageT2Idx = newOrthoData.Staging.length - 1;
         const newStage = { ...newOrthoData.Staging[stageT2Idx], RelativeToothTransforms: { ...newOrthoData.Staging[stageT2Idx].RelativeToothTransforms } };
@@ -197,13 +194,17 @@ export default function Ortho(props) {
           newStage.RelativeToothTransforms[toothID] = prediction[toothID];
         }
         newOrthoData.Staging[stageT2Idx] = newStage;
-        // console.log("stageT2Idx", stageT2Idx);
+        setTimeout(() => {
+          if (window.commandManager) {
+            window.commandManager.execute(new PredictCommand(before, newOrthoData, setOrthoData));
+          }
+        }, 0);
         return newOrthoData;
       });
     } catch (err) {
       console.error('Init Predict error:', err);
     }
-  }, [baseCaseFilename, setOrthoData]);
+  }, [baseCaseFilename, setOrthoData, orthoData]);
 
   return (
     <div style={{ width: '100%', height: '100%' }}>
