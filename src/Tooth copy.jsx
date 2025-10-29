@@ -1,10 +1,16 @@
 import React from 'react';
+import TransformCommand from './undo/TransformCommand';
+import { sceneApi } from './undo/sceneApi';
+// Access the global command manager (created in Overlay)
+const getCommandManager = () => window.commandManager;
 import { useLoader, useFrame } from '@react-three/fiber';
-import { TransformControls, Html } from '@react-three/drei';
+import { TransformControls, Html, Text } from '@react-three/drei';
+// import { Html, Text } from '@react-three/drei';
 import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import * as THREE from 'three'
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader';
-import { TextureLoader } from 'three/src/loaders/TextureLoader'
+import { TextureLoader } from 'three/src/loaders/TextureLoader';
+import CombinedTransformControls from "./CombinedTransformControls";
 
 export function Tooth(props) {  
   const { toothID, url, stagingData, onTransform, landmarks, trackballControlsRef, isClicked, onToothClick, useShortRoots = false, showLandmarks = true } = props;
@@ -88,13 +94,37 @@ export function Tooth(props) {
   }
 
   function LandMark({ lmType, color }) {
-    const lmPoint = landmarks[lmType];
-    return (
-      <mesh position={lmPoint}>
-        <sphereGeometry args={[0.2]} />
-        <meshStandardMaterial color={color} />
-      </mesh>
-    );
+    const lmData = landmarks[lmType];
+    // If it's a line landmark (object with start/end), draw a line
+    if (lmData && lmData.start && lmData.end) {
+      const points = [lmData.start, lmData.end];
+      const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
+      // const lineMaterial = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.8 });
+      const lineMaterial = new THREE.LineBasicMaterial({ color });
+      return (
+        <>
+          <line geometry={lineGeometry} material={lineMaterial} />
+          <mesh position={lmData.start}>
+            <sphereGeometry args={[0.13]} />
+            <meshStandardMaterial color={color} />
+          </mesh>
+          <mesh position={lmData.end}>
+            <sphereGeometry args={[0.13]} />
+            <meshStandardMaterial color={color} />
+          </mesh>
+        </>
+      );
+    }
+    // Otherwise, draw a sphere for point landmark
+    if (lmData) {
+      return (
+        <mesh position={lmData}>
+          <sphereGeometry args={[0.2]} />
+          <meshStandardMaterial color={color} />
+        </mesh>
+      );
+    }
+    return null;
   }
 
   const [meshCenter, setMeshCenter] = useState(new THREE.Vector3());
@@ -154,22 +184,13 @@ export function Tooth(props) {
     >
       {combinedGeometries.crownGeometry && <mesh geometry={combinedGeometries.crownGeometry} material={crownMaterial} />}
       {combinedGeometries.rootGeometry && <mesh geometry={combinedGeometries.rootGeometry} material={rootMaterial} />}
-      {/* Show tooth number in black next to each existing tooth */}
-      <Html style={{ 
-        color: 'darkgrey', 
-        fontWeight: 'bold', 
-        // background: 'rgba(255,255,255,0.2)', 
-        // padding: '2px 6px', 
-        // borderRadius: '3px', 
-        fontSize: '14px' }}
-      >
-        {toothID}
-      </Html>
+      <ToothNumberLabel toothID={toothID} />
       {showLandmarks && (
         <>
           <LandMark lmType="BCPoint" color="darkorange" />
           <LandMark lmType="FEGJPoint" color="brown" />
           <LandMark lmType="MRAPoint" color="darkblue" />
+          <LandMark lmType="MDWLine" color="darkred" />
         </>
       )}
       {useShortRoots && showLandmarks && landmarks?.MRAPoint && meshCenter && (
@@ -179,11 +200,11 @@ export function Tooth(props) {
         />
       )}
     </group>
-  )
-  ;
+  );
 
   const [isDragging, setIsDragging] = useState(false);
   const [initialTransform, setInitialTransform] = useState(null);
+  const commandRef = useRef(null);
   
   useEffect(() => {
     if (isClicked && toothRef.current) {
@@ -199,38 +220,77 @@ export function Tooth(props) {
       trackballControlsRef.current.enabled = false;
       setIsDragging(true);
     }
-  }, [trackballControlsRef]);
+    // Capture before snapshot and create command
+    if (toothRef.current) {
+      const before = {
+        position: toothRef.current.position.clone(),
+        quaternion: toothRef.current.quaternion.clone(),
+      };
+      // setOrthoData and stage are passed via props (from ToothPlacement)
+      commandRef.current = new TransformCommand(
+        toothID,
+        { [toothID]: {
+          position: before.position.toArray(),
+          quaternion: before.quaternion.toArray(),
+        } },
+        { [toothID]: {
+          position: before.position.toArray(),
+          quaternion: before.quaternion.toArray(),
+        } },
+        sceneApi,
+        props.setOrthoData,
+        props.stage
+      );
+    }
+  }, [trackballControlsRef, toothID, props.setOrthoData, props.stage]);
   // }, []);
 
   const handleTransformEnd = useCallback(() => {
     if (trackballControlsRef?.current) {
       trackballControlsRef.current.enabled = true;
       setIsDragging(false);
-      // console.log("end drag")
     }
-    if (toothRef.current && initialTransform) {
+    if (toothRef.current && commandRef.current) {
+      // Set after snapshot
+      commandRef.current.after[toothID] = {
+        position: toothRef.current.position.toArray(),
+        quaternion: toothRef.current.quaternion.toArray(),
+      };
+      // Execute command (push to undo stack)
+      const manager = getCommandManager();
+      if (manager) manager.execute(commandRef.current);
+      commandRef.current = null;
+    }
+    // Optionally still call onTransform for app state
+    if (toothRef.current) {
       const newTransforms = {
         translation: toothRef.current.position.clone(),
         rotation: toothRef.current.quaternion.clone()
       };
       onTransform(toothID, newTransforms);
-      console.log("end drag 2 part")
     }
-  }, [trackballControlsRef, initialTransform]);
+  }, [trackballControlsRef, toothID, onTransform]);
   // }, []);
 
 
 
   const handleObjectChange = useCallback(() => {
-    if (toothRef.current && initialTransform) {
+    if (toothRef.current && commandRef.current) {
+      // Update after snapshot live during drag
+      commandRef.current.after[toothID] = {
+        position: toothRef.current.position.toArray(),
+        quaternion: toothRef.current.quaternion.toArray(),
+      };
+    }
+    // Optionally still call onTransform for app state
+    if (toothRef.current) {
       const newTransforms = {
         translation: toothRef.current.position.clone(),
         rotation: toothRef.current.quaternion.clone()
       };
       onTransform(toothID, newTransforms);
-      console.log("from handleObjectChange")
     }
-  }, [toothID, onTransform, initialTransform, isDragging]);
+  }, [toothID, onTransform]);
   // }, []);
 
   const TransformHint = () => (
@@ -280,14 +340,6 @@ export function Tooth(props) {
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [isClicked]);
   
-  // Debug: log transformation data for each tooth
-  // useEffect(() => {
-  //   // console.log(`Tooth ${toothID} stagingData:`, stagingData);
-  //   if (toothID == '11') {
-  //   console.log(`Tooth ${toothID} position:`, position);
-  //   console.log(`Tooth ${toothID} quaternion:`, quaternion);}
-  // }, [toothID, stagingData, position, quaternion]);
-
   return (
     <>
       {meshContent}
@@ -298,9 +350,11 @@ export function Tooth(props) {
             mode={transformMode}
             size={0.7}
             object={toothRef.current}
+            space="local"
+            // lineWidth={9} // Это не катит - надо форкать и менять контрол или использовать THREE вариант
             onMouseDown={handleTransformStart}
             onMouseUp={handleTransformEnd}
-            // onObjectChange={handleObjectChange}
+            onObjectChange={handleObjectChange}
             onPointerDown={(e) => e.stopPropagation()}
             onPointerUp={(e) => e.stopPropagation()}
             onPointerMove={(e) => e.stopPropagation()}
@@ -309,5 +363,35 @@ export function Tooth(props) {
         </>
       )}
     </>
+  );
+}
+
+// 3D label for tooth number
+function ToothNumberLabel({ toothID }) {
+  // Support supernumerary teeth: if id > 50 and id-40 is a valid tooth, treat as supernumerary
+  const idNum = parseInt(toothID);
+  let displayID = toothID;
+  let isSupernumerary = false;
+  if (idNum > 50 && idNum - 40 > 0 && idNum - 40 < 50) {
+    // displayID = `${idNum - 40}`;
+    isSupernumerary = true;
+  }
+  const isUpper = idNum < 30 || (isSupernumerary && idNum - 40 < 30);
+  const isAnterior = (isSupernumerary ? (idNum - 40) : idNum) % 10 <= 3;
+  const position = isAnterior ? [0, -4, 5] : [0, -6, 3];
+  const rotation = isUpper ? [Math.PI / 2, 0, Math.PI] : [Math.PI / 2, 0, 0];
+  return (
+    <Text
+      position={position}
+      rotation={rotation}
+      fontSize={1.0}
+      color={isSupernumerary ? "#b22222" : "black"}
+      anchorX="center"
+      anchorY="middle"
+      outlineWidth={0.04}
+      outlineColor={isSupernumerary ? "#ffcccc" : "white"}
+    >
+      {displayID}
+    </Text>
   );
 }

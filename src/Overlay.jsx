@@ -22,7 +22,7 @@ import { useState } from 'react';
 import CommandManager from './undo/CommandManager'
 import { sceneApi } from './undo/sceneApi'
 
-function MenuBar({ onFileLoaded }) {
+function MenuBar({ onFileLoaded, setStatus, setLoading }) {
   const [anchorEls, setAnchorEls] = React.useState({})
   const menus = [
     { label: 'File', items: ['New', 'Open', 'Save', 'Exit'] },
@@ -48,16 +48,57 @@ function MenuBar({ onFileLoaded }) {
 
   // --- Add Open handler ---
   const handleOpenOAS = async () => {
+    // Update React state (keeps app consistent) and also show an immediate DOM overlay
+    if (setStatus) setStatus('Loading...');
+    if (setLoading) setLoading(true);
+
+    const showDomLoading = () => {
+      if (document.getElementById('oas-loading-indicator')) return;
+      const el = document.createElement('div');
+      el.id = 'oas-loading-indicator';
+      el.innerText = 'Status: Loading...';
+      Object.assign(el.style, {
+        position: 'fixed',
+        left: '0',
+        right: '0',
+        bottom: '0',
+        height: '32px',
+        background: 'rgba(240,240,240,0.95)',
+        borderTop: '1px solid #ccc',
+        display: 'flex',
+        alignItems: 'center',
+        padding: '0 16px',
+        fontSize: '15px',
+        color: '#333',
+        zIndex: 99999,
+        pointerEvents: 'none'
+      });
+      document.body.appendChild(el);
+    };
+    const hideDomLoading = () => {
+      const el = document.getElementById('oas-loading-indicator');
+      if (el) el.remove();
+    };
+
+    showDomLoading();
+
     // Open file dialog for .oas files
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.oas';
     input.style.display = 'none';
     document.body.appendChild(input);
-    input.click();
+    // open the file dialog on the next animation frame so the Loading indicator can appear first
+    requestAnimationFrame(() => input.click());
     input.onchange = async (e) => {
       const file = e.target.files[0];
-      if (!file) return;
+      if (!file) {
+        if (setStatus) setStatus('');
+        if (setLoading) setLoading(false);
+        hideDomLoading();
+        try { document.body.removeChild(input); } catch (e) { /* ignore */ }
+        return;
+      }
       try {
         // 1. Upload the file to backend
         const formData = new FormData();
@@ -72,8 +113,12 @@ function MenuBar({ onFileLoaded }) {
         if (onFileLoaded) onFileLoaded(file.name);
       } catch (err) {
         console.error('Export failed:', err);
+      } finally {
+        if (setStatus) setStatus('');
+        if (setLoading) setLoading(false);
+        hideDomLoading();
+        try { document.body.removeChild(input); } catch (e) { /* ignore */ }
       }
-      document.body.removeChild(input);
     };
   };
 
@@ -306,7 +351,7 @@ export default function Overlay({ children, stage, maxStage, onStageChange, onVi
       </Box>
       {/* Overlay UI panels */}
       <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 2, pointerEvents: 'auto' }}>
-        <MenuBar onFileLoaded={onFileLoaded} />
+        <MenuBar onFileLoaded={onFileLoaded} setStatus={setStatus} setLoading={setLoading} />
       </Box>
       <Box sx={{ position: 'absolute', top: '50%', left: 20, transform: 'translateY(-60%)', zIndex: 2, display: 'flex', flexDirection: 'column', pointerEvents: 'none' }}>
         <Box sx={{ pointerEvents: 'auto' }}>

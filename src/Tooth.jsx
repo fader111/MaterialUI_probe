@@ -1,31 +1,23 @@
+
 import React from 'react';
 import TransformCommand from './undo/TransformCommand';
 import { sceneApi } from './undo/sceneApi';
-// Access the global command manager (created in Overlay)
 const getCommandManager = () => window.commandManager;
 import { useLoader, useFrame } from '@react-three/fiber';
 import { TransformControls, Html, Text } from '@react-three/drei';
-// import { Html, Text } from '@react-three/drei';
 import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
-import * as THREE from 'three'
+import * as THREE from 'three';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader';
 import { TextureLoader } from 'three/src/loaders/TextureLoader';
 import CombinedTransformControls from "./CombinedTransformControls";
 
-export function Tooth(props) {  
-  const { toothID, url, stagingData, onTransform, landmarks, trackballControlsRef, isClicked, onToothClick, useShortRoots = false, showLandmarks = true } = props;
-
-  const [hovered, hover] = useState(false);
-  const toothRef = useRef(); 
-
-  // Robust STL loading with error handling
+// Custom hook for loading tooth mesh and texture
+function useToothMesh(toothID, caseId, useShortRoots) {
   const [crown, setCrown] = useState(null);
   const [root, setRoot] = useState(null);
   const [loadError, setLoadError] = useState(false);
   const [texture, setTexture] = useState(null);
 
-  // STL loading 
-  const caseId = props.baseCaseFilename || props.meshVersion;
   useEffect(() => {
     let isMounted = true;
     setLoadError(false);
@@ -54,6 +46,19 @@ export function Tooth(props) {
     );
     return () => { isMounted = false; };
   }, [toothID, caseId, useShortRoots]);
+
+  return { crown, root, loadError, texture };
+}
+
+export function Tooth(props) {
+  const { toothID, url, stagingData, onTransform, landmarks, trackballControlsRef, isClicked, onToothClick, useShortRoots = false, showLandmarks = true } = props;
+
+  const [hovered, hover] = useState(false);
+  const toothRef = useRef();
+
+  // Use custom hook for mesh loading
+  const caseId = props.baseCaseFilename || props.meshVersion;
+  const { crown, root, loadError, texture } = useToothMesh(toothID, caseId, useShortRoots);
 
   const position = stagingData.position;
   const quaternion = stagingData.quaternion;
@@ -190,7 +195,7 @@ export function Tooth(props) {
           <LandMark lmType="BCPoint" color="darkorange" />
           <LandMark lmType="FEGJPoint" color="brown" />
           <LandMark lmType="MRAPoint" color="darkblue" />
-          <LandMark lmType="MDWLine" color="darkred"       />
+          <LandMark lmType="MDWLine" color="darkred" />
         </>
       )}
       {useShortRoots && showLandmarks && landmarks?.MRAPoint && meshCenter && (
