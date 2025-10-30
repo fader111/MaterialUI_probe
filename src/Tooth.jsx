@@ -6,9 +6,11 @@ const getCommandManager = () => window.commandManager;
 import { useLoader, useFrame } from '@react-three/fiber';
 import { TransformControls, Html, Text } from '@react-three/drei';
 import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
+import { useToothTransform } from "./useToothTransform";
 import * as THREE from 'three';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader';
 import { TextureLoader } from 'three/src/loaders/TextureLoader';
+import { LandMark, LandmarksGroup, MainLine, ToothNumberLabel } from './ToothLandmarks.jsx';
 import CombinedTransformControls from "./CombinedTransformControls";
 
 // Custom hook for loading tooth mesh and texture
@@ -54,7 +56,7 @@ export function Tooth(props) {
   const { toothID, url, stagingData, onTransform, landmarks, trackballControlsRef, isClicked, onToothClick, useShortRoots = false, showLandmarks = true } = props;
 
   const [hovered, hover] = useState(false);
-  const toothRef = useRef();
+  // Removed old toothRef declaration; now provided by useToothTransform
 
   // Use custom hook for mesh loading
   const caseId = props.baseCaseFilename || props.meshVersion;
@@ -98,40 +100,6 @@ export function Tooth(props) {
     else return "white";
   }
 
-  function LandMark({ lmType, color }) {
-    const lmData = landmarks[lmType];
-    // If it's a line landmark (object with start/end), draw a line
-    if (lmData && lmData.start && lmData.end) {
-      const points = [lmData.start, lmData.end];
-      const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
-      // const lineMaterial = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.8 });
-      const lineMaterial = new THREE.LineBasicMaterial({ color });
-      return (
-        <>
-          <line geometry={lineGeometry} material={lineMaterial} />
-          <mesh position={lmData.start}>
-            <sphereGeometry args={[0.13]} />
-            <meshStandardMaterial color={color} />
-          </mesh>
-          <mesh position={lmData.end}>
-            <sphereGeometry args={[0.13]} />
-            <meshStandardMaterial color={color} />
-          </mesh>
-        </>
-      );
-    }
-    // Otherwise, draw a sphere for point landmark
-    if (lmData) {
-      return (
-        <mesh position={lmData}>
-          <sphereGeometry args={[0.2]} />
-          <meshStandardMaterial color={color} />
-        </mesh>
-      );
-    }
-    return null;
-  }
-
   const [meshCenter, setMeshCenter] = useState(new THREE.Vector3());
 
   useEffect(() => {
@@ -147,24 +115,35 @@ export function Tooth(props) {
     }
   }, [combinedGeometries]);
 
-  const MainLine = ({ start, end }) => {
-    const points = [start, end];
-    const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
-    const lineMaterial = new THREE.LineBasicMaterial({ 
-      color: 0x9090EE, // light blue
-      transparent: true,
-      opacity: 0.6,
-      linewidth: 1
-    });
-    return <line geometry={lineGeometry} material={lineMaterial} />;
-  };
-
   // Log missing tooth info to console
   useEffect(() => {
     if (loadError) {
       console.warn(`Missing STL for tooth ${toothID}`);
     }
   }, [loadError, toothID]);
+
+  // Transform/undo logic extracted to custom hook
+  const {
+    isDragging,
+    handleTransformStart,
+    handleTransformEnd,
+    handleObjectChange,
+    toothRef,
+  } = useToothTransform({
+    toothID,
+    trackballControlsRef,
+    onTransform: (id, transform) => {
+      // Always pass plain objects, not THREE.Vector3/Quaternion
+      const plainTransform = {
+        position: transform.position ? { x: transform.position.x, y: transform.position.y, z: transform.position.z } : null,
+        quaternion: transform.quaternion ? { x: transform.quaternion.x, y: transform.quaternion.y, z: transform.quaternion.z, w: transform.quaternion.w } : null,
+      };
+      if (onTransform) onTransform(id, plainTransform);
+    },
+    isClicked,
+    setOrthoData: props.setOrthoData,
+    stage: props.stage,
+  });
 
   // render meshContent 
   const meshContent = loadError ? (
@@ -190,121 +169,59 @@ export function Tooth(props) {
       {combinedGeometries.crownGeometry && <mesh geometry={combinedGeometries.crownGeometry} material={crownMaterial} />}
       {combinedGeometries.rootGeometry && <mesh geometry={combinedGeometries.rootGeometry} material={rootMaterial} />}
       <ToothNumberLabel toothID={toothID} />
-      {showLandmarks && (
-        <>
-          <LandMark lmType="BCPoint" color="darkorange" />
-          <LandMark lmType="FEGJPoint" color="brown" />
-          <LandMark lmType="MRAPoint" color="darkblue" />
-          <LandMark lmType="MDWLine" color="darkred" />
-        </>
-      )}
+      {showLandmarks && <LandmarksGroup landmarks={landmarks} />}
       {useShortRoots && showLandmarks && landmarks?.MRAPoint && meshCenter && (
-        <MainLine 
-          start={meshCenter}
-          end={landmarks.MRAPoint}
-        />
+        <MainLine start={meshCenter} end={landmarks.MRAPoint} />
       )}
     </group>
   );
+  const [transformMode, setTransformMode] = useState('rotate');
 
-  const [isDragging, setIsDragging] = useState(false);
-  const [initialTransform, setInitialTransform] = useState(null);
-  const commandRef = useRef(null);
-  
+  // Add keyboard event handler
   useEffect(() => {
-    if (isClicked && toothRef.current) {
-      setInitialTransform({
-        position: toothRef.current.position.clone(),
-        quaternion: toothRef.current.quaternion.clone()
-      });
-    }
+    const handleKeyPress = (event) => {
+      if (!isClicked) return;
+      
+      if (event.key.toLowerCase() === 't' || event.key.toLowerCase() === 'е') {
+        setTransformMode('translate');
+      } else if (event.key.toLowerCase() === 'r' || event.key.toLowerCase() === 'к') {
+        setTransformMode('rotate');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
   }, [isClicked]);
 
-  const handleTransformStart = useCallback(() => {
-    if (trackballControlsRef?.current) {
-      trackballControlsRef.current.enabled = false;
-      setIsDragging(true);
-    }
-    // Capture before snapshot and create command
-    if (toothRef.current) {
-      const before = {
-        position: toothRef.current.position.clone(),
-        quaternion: toothRef.current.quaternion.clone(),
-      };
-      // setOrthoData and stage are passed via props (from ToothPlacement)
-      commandRef.current = new TransformCommand(
-        toothID,
-        { [toothID]: {
-          position: before.position.toArray(),
-          quaternion: before.quaternion.toArray(),
-        } },
-        { [toothID]: {
-          position: before.position.toArray(),
-          quaternion: before.quaternion.toArray(),
-        } },
-        sceneApi,
-        props.setOrthoData,
-        props.stage
-      );
-    }
-  }, [trackballControlsRef, toothID, props.setOrthoData, props.stage]);
-  // }, []);
-
-  const handleTransformEnd = useCallback(() => {
-    if (trackballControlsRef?.current) {
-      trackballControlsRef.current.enabled = true;
-      setIsDragging(false);
-    }
-    if (toothRef.current && commandRef.current) {
-      // Set after snapshot
-      commandRef.current.after[toothID] = {
-        position: toothRef.current.position.toArray(),
-        quaternion: toothRef.current.quaternion.toArray(),
-      };
-      // Execute command (push to undo stack)
-      const manager = getCommandManager();
-      if (manager) manager.execute(commandRef.current);
-      commandRef.current = null;
-    }
-    // Optionally still call onTransform for app state
-    if (toothRef.current) {
-      const newTransforms = {
-        translation: toothRef.current.position.clone(),
-        rotation: toothRef.current.quaternion.clone()
-      };
-      onTransform(toothID, newTransforms);
-    }
-  }, [trackballControlsRef, toothID, onTransform]);
-  // }, []);
-
-
-
-  const handleObjectChange = useCallback(() => {
-    if (toothRef.current && commandRef.current) {
-      // Update after snapshot live during drag
-      commandRef.current.after[toothID] = {
-        position: toothRef.current.position.toArray(),
-        quaternion: toothRef.current.quaternion.toArray(),
-      };
-    }
-    // Optionally still call onTransform for app state
-    if (toothRef.current) {
-      const newTransforms = {
-        translation: toothRef.current.position.clone(),
-        rotation: toothRef.current.quaternion.clone()
-      };
-      onTransform(toothID, newTransforms);
-    }
-  }, [toothID, onTransform]);
-  // }, []);
-
-  const TransformHint = () => (
+  return (
     <>
-      {!isDragging && (
+      {meshContent}
+      {isClicked && toothRef.current && (
+        <>
+          <TransformControls
+            enabled={true}
+            mode={transformMode}
+            size={0.7}
+            object={toothRef.current}
+            space="local"
+            // lineWidth={9} // Это не катит - надо форкать и менять контрол или использовать THREE вариант
+            onMouseDown={handleTransformStart}
+            onMouseUp={handleTransformEnd}
+            onObjectChange={handleObjectChange}
+            onPointerDown={(e) => e.stopPropagation()}
+            onPointerUp={(e) => e.stopPropagation()}
+            onPointerMove={(e) => e.stopPropagation()}
+          />
+        </>
+      )}
+      {/* <TransformHint /> */}
+      {isClicked && (
         <Html
+          position={[0, 0, 20]}
+          // fullscreen
           style={{
             position: 'absolute',
-            top: '20%',      // Moved higher up
+            top: '50%',      // Move higher up
             left: '50%',
             transform: 'translateX(-50%)',
             background: 'rgba(209, 201, 201, 0.37)',
@@ -325,78 +242,5 @@ export function Tooth(props) {
         </Html>
       )}
     </>
-  );
-
-  const [transformMode, setTransformMode] = useState('rotate');
-
-  // Add keyboard event handler
-  useEffect(() => {
-    const handleKeyPress = (event) => {
-      if (!isClicked) return;
-      
-      if (event.key.toLowerCase() === 't' || event.key.toLowerCase() === 'е') {
-        setTransformMode('translate');
-      } else if (event.key.toLowerCase() === 'r' || event.key.toLowerCase() === 'к') {
-        setTransformMode('rotate');
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [isClicked]);
-  
-  return (
-    <>
-      {meshContent}
-      {isClicked && toothRef.current && (
-        <>
-          <TransformControls
-            enabled={true}
-            mode={transformMode}
-            size={0.7}
-            object={toothRef.current}
-            space="local"
-            // lineWidth={9} // Это не катит - надо форкать и менять контрол или использовать THREE вариант
-            onMouseDown={handleTransformStart}
-            onMouseUp={handleTransformEnd}
-            onObjectChange={handleObjectChange}
-            onPointerDown={(e) => e.stopPropagation()}
-            onPointerUp={(e) => e.stopPropagation()}
-            onPointerMove={(e) => e.stopPropagation()}
-          />
-          <TransformHint />
-        </>
-      )}
-    </>
-  );
-}
-
-// 3D label for tooth number
-function ToothNumberLabel({ toothID }) {
-  // Support supernumerary teeth: if id > 50 and id-40 is a valid tooth, treat as supernumerary
-  const idNum = parseInt(toothID);
-  let displayID = toothID;
-  let isSupernumerary = false;
-  if (idNum > 50 && idNum - 40 > 0 && idNum - 40 < 50) {
-    // displayID = `${idNum - 40}`;
-    isSupernumerary = true;
-  }
-  const isUpper = idNum < 30 || (isSupernumerary && idNum - 40 < 30);
-  const isAnterior = (isSupernumerary ? (idNum - 40) : idNum) % 10 <= 3;
-  const position = isAnterior ? [0, -4, 5] : [0, -6, 3];
-  const rotation = isUpper ? [Math.PI / 2, 0, Math.PI] : [Math.PI / 2, 0, 0];
-  return (
-    <Text
-      position={position}
-      rotation={rotation}
-      fontSize={1.0}
-      color={isSupernumerary ? "#b22222" : "black"}
-      anchorX="center"
-      anchorY="middle"
-      outlineWidth={0.04}
-      outlineColor={isSupernumerary ? "#ffcccc" : "white"}
-    >
-      {displayID}
-    </Text>
   );
 }

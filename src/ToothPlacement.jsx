@@ -176,17 +176,20 @@ export const ToothPlacement = forwardRef((props, ref) => {
     const handleToothTransformControl = useCallback((toothId, transforms) => {
         console.log("handleToothTransformControl called for toothId:", toothId, "with transforms:", transforms);
         if (orthoData?.Staging && orthoData.Staging[stage]) {
-            const localTranslation = transforms.translation;
-            const localRotation = new THREE.Quaternion(
-                transforms.rotation.x,
-                transforms.rotation.y,
-                transforms.rotation.z,
-                transforms.rotation.w
-            );
-            // Ensure translation is always a plain object !!! Refactor that!!!!
-            const translationObj = (localTranslation instanceof THREE.Vector3)
+            // Defensive checks
+            const localTranslation = transforms?.position;
+            const rotation = transforms?.quaternion;
+            let localRotation = null;
+            if (rotation && typeof rotation.x === 'number' && typeof rotation.y === 'number' && typeof rotation.z === 'number' && typeof rotation.w === 'number') {
+                localRotation = new THREE.Quaternion(rotation.x, rotation.y, rotation.z, rotation.w);
+            } else {
+                // fallback to identity quaternion
+                localRotation = new THREE.Quaternion();
+            }
+            // Ensure translation is always a plain object
+            const translationObj = (localTranslation && localTranslation instanceof THREE.Vector3)
                 ? { x: localTranslation.x, y: localTranslation.y, z: localTranslation.z }
-                : localTranslation;
+                : (localTranslation || { x: 0, y: 0, z: 0 });
             const localTransforms = {
                 translation: translationObj,
                 rotation: {
