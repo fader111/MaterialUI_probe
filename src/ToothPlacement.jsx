@@ -174,7 +174,7 @@ export const ToothPlacement = forwardRef((props, ref) => {
 
         // handke 
     const handleToothTransformControl = useCallback((toothId, transforms) => {
-        console.log("handleToothTransformControl called for toothId:", toothId, "with transforms:", transforms);
+        // console.log("handleToothTransformControl called for toothId:", toothId, "with transforms:", transforms);
         if (orthoData?.Staging && orthoData.Staging[stage]) {
             // Defensive checks
             const localTranslation = transforms?.position;

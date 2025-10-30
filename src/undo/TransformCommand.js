@@ -34,9 +34,11 @@ export default class TransformCommand {
           if (t) {
             newStage.RelativeToothTransforms[id] = {
               ...newStage.RelativeToothTransforms[id],
-              translation: { x: t.position[0], y: t.position[1], z: t.position[2] },
+              translation: t.position
+                ? { x: t.position.x, y: t.position.y, z: t.position.z }
+                : newStage.RelativeToothTransforms[id].translation,
               rotation: t.quaternion
-                ? { x: t.quaternion[0], y: t.quaternion[1], z: t.quaternion[2], w: t.quaternion[3] }
+                ? { x: t.quaternion.x, y: t.quaternion.y, z: t.quaternion.z, w: t.quaternion.w }
                 : newStage.RelativeToothTransforms[id].rotation
             };
           }
@@ -67,9 +69,11 @@ export default class TransformCommand {
           if (t) {
             newStage.RelativeToothTransforms[id] = {
               ...newStage.RelativeToothTransforms[id],
-              translation: { x: t.position[0], y: t.position[1], z: t.position[2] },
+              translation: t.position
+                ? { x: t.position.x, y: t.position.y, z: t.position.z }
+                : newStage.RelativeToothTransforms[id].translation,
               rotation: t.quaternion
-                ? { x: t.quaternion[0], y: t.quaternion[1], z: t.quaternion[2], w: t.quaternion[3] }
+                ? { x: t.quaternion.x, y: t.quaternion.y, z: t.quaternion.z, w: t.quaternion.w }
                 : newStage.RelativeToothTransforms[id].rotation
             };
           }

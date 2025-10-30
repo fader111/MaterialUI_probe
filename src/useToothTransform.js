@@ -50,11 +50,12 @@ export function useToothTransform({
       !initialTransform.quaternion.equals(newTransform.quaternion))
     ) {
       commandRef.current = new TransformCommand(
-        toothID,
-        initialTransform,
-        newTransform,
-        setOrthoData,
-        stage
+  toothID,
+  { [toothID]: initialTransform },
+  { [toothID]: newTransform },
+  sceneApi,
+  setOrthoData,
+  stage
       );
       if (sceneApi && typeof sceneApi.executeCommand === 'function') {
         sceneApi.executeCommand(commandRef.current);
