@@ -1,16 +1,22 @@
-
-import React from 'react';
-import TransformCommand from './undo/TransformCommand';
-import { sceneApi } from './undo/sceneApi';
+import React from "react";
+import TransformCommand from "./undo/TransformCommand";
+import { sceneApi } from "./undo/sceneApi";
 const getCommandManager = () => window.commandManager;
-import { useLoader, useFrame } from '@react-three/fiber';
-import { TransformControls, Html, Text } from '@react-three/drei';
-import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
+import { useLoader, useFrame } from "@react-three/fiber";
+import { TransformControls, Html, Text } from "@react-three/drei";
+import { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { useToothTransform } from "./useToothTransform";
-import * as THREE from 'three';
-import { STLLoader } from 'three/examples/jsm/loaders/STLLoader';
-import { TextureLoader } from 'three/src/loaders/TextureLoader';
-import { LandMark, LandmarksGroup, MainLine, ToothNumberLabel } from './ToothLandmarks.jsx';
+import * as THREE from "three";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+import { MeshBVH } from "three-mesh-bvh";
+import { STLLoader } from "three/examples/jsm/loaders/STLLoader";
+import { TextureLoader } from "three/src/loaders/TextureLoader";
+import {
+  LandMark,
+  LandmarksGroup,
+  MainLine,
+  ToothNumberLabel,
+} from "./ToothLandmarks.jsx";
 import CombinedTransformControls from "./CombinedTransformControls";
 
 // Custom hook for loading tooth mesh and texture
@@ -26,66 +32,107 @@ function useToothMesh(toothID, caseId, useShortRoots) {
     // Load crown STL
     new STLLoader().load(
       `/crowns/${toothID}.stl?case=${caseId}`,
-      geometry => { if (isMounted) setCrown(geometry); },
+      (geometry) => {
+        if (isMounted) setCrown(geometry);
+      },
       undefined,
-      err => { if (isMounted) setLoadError(true); }
+      (err) => {
+        if (isMounted) setLoadError(true);
+      }
     );
     // Load root STL
     new STLLoader().load(
       useShortRoots
         ? `/shortRoots/${toothID}.stl?case=${caseId}`
         : `/roots/${toothID}.stl?case=${caseId}`,
-      geometry => { if (isMounted) setRoot(geometry); },
+      (geometry) => {
+        if (isMounted) setRoot(geometry);
+      },
       undefined,
-      err => { if (isMounted) setLoadError(true); }
+      (err) => {
+        if (isMounted) setLoadError(true);
+      }
     );
     // Load texture
     new TextureLoader().load(
       `/textures/teeth.png`,
-      tex => { if (isMounted) setTexture(tex); },
+      (tex) => {
+        if (isMounted) setTexture(tex);
+      },
       undefined,
-      err => { if (isMounted) setTexture(null); }
+      (err) => {
+        if (isMounted) setTexture(null);
+      }
     );
-    return () => { isMounted = false; };
+    return () => {
+      isMounted = false;
+    };
   }, [toothID, caseId, useShortRoots]);
 
   return { crown, root, loadError, texture };
 }
 
 export function Tooth(props) {
-  const { toothID, url, stagingData, onTransform, landmarks, trackballControlsRef, isClicked, onToothClick, useShortRoots = false, showLandmarks = true } = props;
+  const {
+    toothID,
+    url,
+    stagingData,
+    onTransform,
+    landmarks,
+    trackballControlsRef,
+    isClicked,
+    onToothClick,
+    useShortRoots = false,
+    showLandmarks = true,
+  } = props;
 
   const [hovered, hover] = useState(false);
   // Removed old toothRef declaration; now provided by useToothTransform
 
   // Use custom hook for mesh loading
   const caseId = props.baseCaseFilename || props.meshVersion;
-  const { crown, root, loadError, texture } = useToothMesh(toothID, caseId, useShortRoots);
+  const { crown, root, loadError, texture } = useToothMesh(
+    toothID,
+    caseId,
+    useShortRoots
+  );
 
   const position = stagingData.position;
   const quaternion = stagingData.quaternion;
 
-  const combinedGeometries = useMemo(() => {
-    if (!crown || !root) return { crownGeometry: null, rootGeometry: null };
+  // Merge crown and root into a single BufferGeometry for BVH
+  // Prepare separate BufferGeometries for rendering and merged for BVH
+  const { crownGeometry, rootGeometry, mergedGeometry } = useMemo(() => {
+    if (!crown || !root)
+      return { crownGeometry: null, rootGeometry: null, mergedGeometry: null };
     const crownGeometry = new THREE.BufferGeometry();
     const rootGeometry = new THREE.BufferGeometry();
-    crownGeometry.setAttribute('position', new THREE.BufferAttribute(crown.attributes.position.array, 3));
-    crownGeometry.setAttribute('normal', new THREE.BufferAttribute(crown.attributes.normal.array, 3));
-    rootGeometry.setAttribute('position', new THREE.BufferAttribute(root.attributes.position.array, 3));
-    rootGeometry.setAttribute('normal', new THREE.BufferAttribute(root.attributes.normal.array, 3));
-    return { crownGeometry, rootGeometry };
+    crownGeometry.setAttribute("position", new THREE.BufferAttribute(crown.attributes.position.array, 3));
+    crownGeometry.setAttribute("normal", new THREE.BufferAttribute(crown.attributes.normal.array, 3));
+    rootGeometry.setAttribute("position", new THREE.BufferAttribute(root.attributes.position.array, 3));
+    rootGeometry.setAttribute("normal", new THREE.BufferAttribute(root.attributes.normal.array, 3));
+    const mergedGeometry = mergeGeometries([crownGeometry, rootGeometry]);
+    return { crownGeometry, rootGeometry, mergedGeometry };
   }, [crown, root]);
 
-  const crownMaterial = texture ? new THREE.MeshStandardMaterial({
-    map: texture,
-    color: getColor({ clicked: isClicked, hovered }),
-    transparent: true,
-    opacity: 1.0
-  }) : new THREE.MeshStandardMaterial({
-    color: getColor({ clicked: isClicked, hovered }),
-    transparent: true,
-    opacity: 1.0
-  });
+  // Build BVH for collision detection
+  const bvh = useMemo(() => {
+    if (!mergedGeometry) return null;
+    return new MeshBVH(mergedGeometry);
+  }, [mergedGeometry]);
+
+  const crownMaterial = texture
+    ? new THREE.MeshStandardMaterial({
+        map: texture,
+        color: getColor({ clicked: isClicked, hovered }),
+        transparent: true,
+        opacity: 1.0,
+      })
+    : new THREE.MeshStandardMaterial({
+        color: getColor({ clicked: isClicked, hovered }),
+        transparent: true,
+        opacity: 1.0,
+      });
 
   const rootMaterial = new THREE.MeshStandardMaterial({
     color: 0x999999, // grey color
@@ -103,17 +150,17 @@ export function Tooth(props) {
   const [meshCenter, setMeshCenter] = useState(new THREE.Vector3());
 
   useEffect(() => {
-    if (combinedGeometries && combinedGeometries.crownGeometry) {
+    if (mergedGeometry) {
       const center = new THREE.Vector3();
-      if (combinedGeometries.crownGeometry.computeBoundingBox) {
-        combinedGeometries.crownGeometry.computeBoundingBox();
-        if (combinedGeometries.crownGeometry.boundingBox) {
-          combinedGeometries.crownGeometry.boundingBox.getCenter(center);
+      if (mergedGeometry.computeBoundingBox) {
+        mergedGeometry.computeBoundingBox();
+        if (mergedGeometry.boundingBox) {
+          mergedGeometry.boundingBox.getCenter(center);
           setMeshCenter(center);
         }
       }
     }
-  }, [combinedGeometries]);
+  }, [mergedGeometry]);
 
   // Log missing tooth info to console
   useEffect(() => {
@@ -135,8 +182,21 @@ export function Tooth(props) {
     onTransform: (id, transform) => {
       // Always pass plain objects, not THREE.Vector3/Quaternion
       const plainTransform = {
-        position: transform.position ? { x: transform.position.x, y: transform.position.y, z: transform.position.z } : null,
-        quaternion: transform.quaternion ? { x: transform.quaternion.x, y: transform.quaternion.y, z: transform.quaternion.z, w: transform.quaternion.w } : null,
+        position: transform.position
+          ? {
+              x: transform.position.x,
+              y: transform.position.y,
+              z: transform.position.z,
+            }
+          : null,
+        quaternion: transform.quaternion
+          ? {
+              x: transform.quaternion.x,
+              y: transform.quaternion.y,
+              z: transform.quaternion.z,
+              w: transform.quaternion.w,
+            }
+          : null,
       };
       if (onTransform) onTransform(id, plainTransform);
     },
@@ -145,7 +205,7 @@ export function Tooth(props) {
     stage: props.stage,
   });
 
-  // render meshContent 
+  // render meshContent
   const meshContent = loadError ? (
     <group ref={toothRef} position={position} quaternion={quaternion}>
       {/* <Html style={{ color: 'red', background: 'rgba(255,0,0,0.1)', padding: '4px', borderRadius: '4px', fontWeight: 'bold' }}>
@@ -166,8 +226,41 @@ export function Tooth(props) {
       onPointerOver={(event) => (event.stopPropagation(), hover(true))}
       onPointerOut={() => hover(false)}
     >
-      {combinedGeometries.crownGeometry && <mesh geometry={combinedGeometries.crownGeometry} material={crownMaterial} />}
-      {combinedGeometries.rootGeometry && <mesh geometry={combinedGeometries.rootGeometry} material={rootMaterial} />}
+      {crownGeometry && (
+        <mesh
+          geometry={crownGeometry}
+          material={crownMaterial}
+          visible={true} // false for debug!!!!!
+        />
+      )}
+      {rootGeometry && (
+        <mesh 
+          geometry={rootGeometry} 
+          material={rootMaterial} 
+          visible={true} // false for debug!!!!!
+          />
+      )}
+      {/* BVH is built from mergedGeometry, debug mesh with texture */}
+      {mergedGeometry && (
+        <mesh
+          geometry={mergedGeometry}
+          material={
+            texture
+              ? new THREE.MeshStandardMaterial({
+                  map: texture,
+                  color: 0xffffff,
+                  transparent: true,
+                  opacity: 1.0,
+                })
+              : new THREE.MeshStandardMaterial({
+                  color: 0xffffff,
+                  transparent: true,
+                  opacity: 1.0,
+                })
+          }
+          visible={false} // true for debug!!!!!
+        />
+      )}
       <ToothNumberLabel toothID={toothID} />
       {showLandmarks && <LandmarksGroup landmarks={landmarks} />}
       {useShortRoots && showLandmarks && landmarks?.MRAPoint && meshCenter && (
@@ -175,22 +268,25 @@ export function Tooth(props) {
       )}
     </group>
   );
-  const [transformMode, setTransformMode] = useState('rotate');
+  const [transformMode, setTransformMode] = useState("rotate");
 
   // Add keyboard event handler
   useEffect(() => {
     const handleKeyPress = (event) => {
       if (!isClicked) return;
-      
-      if (event.key.toLowerCase() === 't' || event.key.toLowerCase() === 'е') {
-        setTransformMode('translate');
-      } else if (event.key.toLowerCase() === 'r' || event.key.toLowerCase() === 'к') {
-        setTransformMode('rotate');
+
+      if (event.key.toLowerCase() === "t" || event.key.toLowerCase() === "е") {
+        setTransformMode("translate");
+      } else if (
+        event.key.toLowerCase() === "r" ||
+        event.key.toLowerCase() === "к"
+      ) {
+        setTransformMode("rotate");
       }
     };
 
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
+    window.addEventListener("keydown", handleKeyPress);
+    return () => window.removeEventListener("keydown", handleKeyPress);
   }, [isClicked]);
 
   return (
@@ -220,20 +316,20 @@ export function Tooth(props) {
           position={[0, 0, 20]}
           // fullscreen
           style={{
-            position: 'absolute',
-            top: '50%',      // Move higher up
-            left: '50%',
-            transform: 'translateX(-50%)',
-            background: 'rgba(209, 201, 201, 0.37)',
-            padding: '8px',
-            borderRadius: '4px',
-            color: 'white',
-            fontSize: '14px',
-            fontFamily: 'Arial',
-            pointerEvents: 'none',
-            userSelect: 'none',
-            whiteSpace: 'nowrap',
-            zIndex: 1000
+            position: "absolute",
+            top: "50%", // Move higher up
+            left: "50%",
+            transform: "translateX(-50%)",
+            background: "rgba(209, 201, 201, 0.37)",
+            padding: "8px",
+            borderRadius: "4px",
+            color: "white",
+            fontSize: "14px",
+            fontFamily: "Arial",
+            pointerEvents: "none",
+            userSelect: "none",
+            whiteSpace: "nowrap",
+            zIndex: 1000,
           }}
           prepend
           portal
