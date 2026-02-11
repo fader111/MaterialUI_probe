@@ -1,10 +1,16 @@
-import React, { useState, useEffect, useMemo, useCallback, forwardRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, forwardRef, useImperativeHandle } from 'react';
 import * as THREE from 'three';
 import { Tooth } from './Tooth';
 // import { Tooth } from './ToothRotated';
 import { rt, transform, toVec3, calcLinearStaging, calcMAPSStaging } from "./misc";
+import { SpaseCollisionResolver } from './SpaseCollisionResolver';
+import { sceneApi } from './undo/sceneApi';
+import TransformCommand from './undo/TransformCommand';
+import { Html } from '@react-three/drei';
+import { MeshBVH, MeshBVHHelper } from "three-mesh-bvh";
 
 export const ToothPlacement = forwardRef((props, ref) => {
+    // --- stagingDataSelector and stagingData must be defined before use ---
     const {
         trackballControlsRef, 
         setControlsEnabled, 
@@ -18,6 +24,67 @@ export const ToothPlacement = forwardRef((props, ref) => {
         useShortRoots = false,
         showLandmarks = true,
     } = props;
+
+    // --- stagingDataSelector and stagingData ---
+    // (copy from below, move up)
+    // const caseStagingData = orthoData?.Staging || null;
+    // ...existing code for caseStagingData, stagesNum, stagingDataT1, stagingDataT2, jsonT1Vec3, etc...
+    const caseStagingData = orthoData?.Staging || null;
+    const stagesNum = caseStagingData ? caseStagingData.length : 0;
+    const stagingDataT1 = caseStagingData && stagesNum > 0 ? caseStagingData[0] : null;
+    const stagingDataT2 = caseStagingData && stagesNum > 0 ? caseStagingData[stagesNum - 1] : null;
+    const { jsonT1Vec3, jsonT2Vec3, jsonStageVec3 } = useMemo(() => {
+        let stageVec3 = {};
+        let t1Vec3 = {};
+        let t2Vec3 = {};
+        if (caseStagingData && stagesNum > 0) {
+            for (const toothID in stagingDataT2.RelativeToothTransforms) {
+                const toothRt = rt(caseStagingData[stage]?.RelativeToothTransforms?.[toothID]);
+                const toothRtT1 = rt(stagingDataT1.RelativeToothTransforms[toothID]);
+                const toothRtT2 = rt(stagingDataT2.RelativeToothTransforms[toothID]);
+                stageVec3[toothID] = {
+                    position: toothRt.translation,
+                    quaternion: toothRt.quaternion
+                };
+                t1Vec3[toothID] = {
+                    position: toothRtT1.translation,
+                    quaternion: toothRtT1.quaternion
+                };
+                t2Vec3[toothID] = {
+                    position: toothRtT2.translation,
+                    quaternion: toothRtT2.quaternion
+                };
+            }
+        }
+        return { jsonT1Vec3: t1Vec3, jsonT2Vec3: t2Vec3, jsonStageVec3: stageVec3 };
+    }, [caseStagingData, stagingDataT1, stage]);
+    const linearStagingData = useMemo(() => calcLinearStaging(jsonT1Vec3, jsonT2Vec3, stagesNum), [stagesNum]);
+    const MAPSStagingData = useMemo(() => calcMAPSStaging(jsonT1Vec3, jsonT2Vec3, stagesNum, stagingPatterns, null), [stagesNum, jsonT1Vec3, stagingPatterns]);
+    const stagingDataSelector = useMemo(() => ({
+        Case: jsonStageVec3,
+        Linear: linearStagingData[stage] || {},
+        MAPS: MAPSStagingData[stage] || {}
+    }), [jsonStageVec3, linearStagingData, MAPSStagingData, stage]);
+    let stagingData = stagingDataSelector[stagingType] || {};
+
+    // --- validToothIDs and currentStageData ---
+    const currentStageData = stagingData;
+    const validToothIDs = Object.keys(currentStageData).filter(toothID => /^\d+$/.test(toothID));
+    
+    // --- force update after all teeth have registered in sceneApi ---
+    const registered = sceneApi.getRegisteredObjects();
+    const [, forceUpdate] = useState(0);
+    // // ...existing code...
+    // useEffect(() => {
+    //     if (
+    //         validToothIDs.length > 0 &&
+    //         registered &&
+    //         registered.length >= validToothIDs.length
+    //     ) {
+    //         forceUpdate(n => n + 1);
+    //     }
+    //     // eslint-disable-next-line react-hooks/exhaustive-deps
+    // }, [validToothIDs.length, registered && registered.length]);
     
     // console.log("ToothPlacement props.meshVersion:", props.meshVersion);
     const [landmarksT1, setLandmarksT1] = useState(null);
@@ -35,104 +102,7 @@ export const ToothPlacement = forwardRef((props, ref) => {
 
     // const jsonMandibularData = orthoData?.mandibularRelativeTransform || null;
     // const jsonMaxillaData = orthoData?.maxillaRelativeTransform || null;
-    const caseStagingData = orthoData?.Staging || null;
-    const mandibularRT = rt(orthoData?.mandibularRelativeTransform || null);
-    const maxillaRT = rt(orthoData?.maxillaRelativeTransform || null);
-    // console.log("ToothPlacement rerender, stage:", stage, "stagingType:", stagingType);
-    // console.log("ToothPlacement rerender, stage:", stage, "stagingData", caseStagingData);
-    // const mandibularOcclusalToJawTransform = orthoData?.mandibularOcclusalToJawTransform || null;
-    // const maxillaOcclusalToJawTransform = orthoData?.maxillaOcclusalToJawTransform || null;
-    
-    const stagesNum = caseStagingData ? caseStagingData.length : 0;
-    const stagingDataT1 = caseStagingData && stagesNum > 0 ? caseStagingData[0] : null;
-    const stagingDataT2 = caseStagingData && stagesNum > 0 ? caseStagingData[stagesNum - 1] : null;
-
-    const { jsonT1Vec3, jsonT2Vec3, jsonStageVec3 } = useMemo(() => {
-        // console.log("call useMemo for jsonVec3");
-        let stageVec3 = {};
-        let t1Vec3 = {};
-        let t2Vec3 = {};
-
-        if (caseStagingData && stagesNum > 0) {
-            for (const toothID in stagingDataT2.RelativeToothTransforms) {
-                
-                // const jawRT = (parseInt(toothID) < 30 ) ? mandibularRT : maxillaRT;
-                // const toothRt = transform(jawRT, rt(caseStagingData[stage]?.RelativeToothTransforms?.[toothID]));
-                // const toothRtT1 = transform(jawRT, rt(stagingDataT1.RelativeToothTransforms[toothID]));
-                // const toothRtT2 = transform(jawRT, rt(stagingDataT2.RelativeToothTransforms[toothID]));
-
-                const toothRt = rt(caseStagingData[stage]?.RelativeToothTransforms?.[toothID]);
-                const toothRtT1 = rt(stagingDataT1.RelativeToothTransforms[toothID]);
-                const toothRtT2 = rt(stagingDataT2.RelativeToothTransforms[toothID]);
-                
-                stageVec3[toothID] = {
-                    position: toothRt.translation,
-                    quaternion: toothRt.quaternion
-                };
-                t1Vec3[toothID] = {
-                    position: toothRtT1.translation,
-                    quaternion: toothRtT1.quaternion
-                };
-                t2Vec3[toothID] = {
-                    position: toothRtT2.translation,
-                    quaternion: toothRtT2.quaternion
-                };
-            }
-        }
-        return { jsonT1Vec3: t1Vec3, jsonT2Vec3: t2Vec3, jsonStageVec3: stageVec3 };
-    }, [caseStagingData, stagingDataT1, stage]);
-
-    useEffect(() => {
-        if (caseStagingData && stagesNum > 0 ) {
-            const landmarksT1_ = {};
-            for (const toothID in stagingDataT1.RelativeToothTransforms) {
-                let lmTypes = {};
-                const toothLandmarks = stagingDataT1.Landmarks[toothID] || {};
-                for (const lmType in toothLandmarks) {
-                    if (lmType.endsWith('Point')) {
-                        // Single point landmark
-                        lmTypes[lmType] = toVec3(toothLandmarks[lmType]);
-                    } else if (lmType.endsWith('Line')) {
-                        // Line landmark: store as {start, end}
-                        const line = toothLandmarks[lmType];
-                        lmTypes[lmType] = {
-                            start: toVec3(line.start),
-                            end: toVec3(line.end)
-                        };
-                    }
-                }
-                landmarksT1_[toothID] = lmTypes;
-            }
-            // console.log("LandmarksT1_", landmarksT1_["11"]);
-            setLandmarksT1(landmarksT1_);
-        }
-    // }, [caseStagingData, stagingDataT1, mandibulaRt, maxillaRt, stagesNum, orthoData]);
-    }, [caseStagingData, stagingDataT1, stagesNum]);
-
-    const linearStagingData = useMemo(() => {
-        // console.log("call LinearStagingData from UseMemo");
-        return calcLinearStaging(jsonT1Vec3, jsonT2Vec3, stagesNum);
-    // }, [jsonT1Vec3, jsonT2Vec3, stagesNum]); // jsonT1Vec3, jsonT2Vec3, меняются что вызывает срабатывание 
-    }, [stagesNum]);
-
-    const MAPSStagingData = useMemo(() => {
-        // console.log("call MAPSStagingData from UseMemo");
-        // console.log("useMemoStagingPatterns", stagingPatterns, stagingPatternsTrigger)
-        // if (!landmarksT1) return {};
-        // const patterns = { 0: "Expand", 1: "Procline", 2: "Distalize" }; // old one - changed to context stagingPatterns
-        return calcMAPSStaging(jsonT1Vec3, jsonT2Vec3, stagesNum, stagingPatterns, landmarksT1);
-    // }, [jsonT1Vec3, jsonT2Vec3, stagesNum, landmarksT1]);
-    // }, [stagesNum, stagingPatternsTrigger, jsonT1Vec3, stagingPatterns]);
-    }, [stagesNum, jsonT1Vec3, stagingPatterns]);
-    // }, []);
-    
-    const stagingDataSelector = useMemo(() => ({
-        Case: jsonStageVec3,
-        Linear: linearStagingData[stage] || {}, // not in use
-        MAPS: MAPSStagingData[stage] || {}
-    }), [jsonStageVec3, linearStagingData, MAPSStagingData, stage]);
-
-    let stagingData = stagingDataSelector[stagingType] || {};
+    // ...existing code...
 
     // const handleToothTransformControl_ = useCallback((toothId, transforms) => {
     //     console.log("handleToothTransformControl called for toothId:", toothId, "with transforms:", transforms);
@@ -222,16 +192,113 @@ export const ToothPlacement = forwardRef((props, ref) => {
 
     // Only R3F objects inside group
     // Use computed stagingData only
-    const currentStageData = stagingData;
     // console.log("rerenderStageData", rerenderStageData);
     // console.log("currentStage Data", stage, currentStageData);
 
     // Filter only valid tooth IDs
-    const validToothIDs = Object.keys(currentStageData).filter(toothID => /^\d+$/.test(toothID));
     // console.log("currentStageData", currentStageData);
 
+    // Compute ordered teeth and centers for visualization and collision logic
+    
+    let ordered = [];
+    let centers = [];
+    let meshes = [];
+    if (registered && registered.length > 0) {
+        // Use maxilla for visualization (or make jaw a prop/state if needed)
+        const jaw = 'maxilla';
+        const filtered = registered.filter(o => {
+            const id = parseInt(o.id, 10);
+            const quadrant = Math.floor(id / 10);
+            const isMaxillary = quadrant === 1 || quadrant === 2;
+            const isMandibular = quadrant === 3 || quadrant === 4;
+            if (jaw === 'mandible') return isMandibular;
+            if (jaw === 'maxilla' ) return isMaxillary;
+            return true;
+        });
+        let sorted = [];
+        if (jaw === 'maxilla') {
+            const q1 = filtered.filter(o => Math.floor(parseInt(o.id,10)/10) === 1)
+                .sort((a,b) => parseInt(b.id,10) - parseInt(a.id,10));
+            const q2 = filtered.filter(o => Math.floor(parseInt(o.id,10)/10) === 2)
+                .sort((a,b) => parseInt(a.id,10) - parseInt(b.id,10));
+            sorted = [...q1, ...q2];
+        } else if (jaw === 'mandible') {
+            const q3 = filtered.filter(o => Math.floor(parseInt(o.id,10)/10) === 3)
+                .sort((a,b) => parseInt(a.id,10) - parseInt(b.id,10));
+            const q4 = filtered.filter(o => Math.floor(parseInt(o.id,10)/10) === 4)
+                .sort((a,b) => parseInt(a.id,10) - parseInt(b.id,10));
+            sorted = [...q3, ...q4];
+        } else {
+            sorted = filtered.sort((a, b) => parseInt(a.id, 10) - parseInt(b.id, 10));
+        }
+        ordered = sorted;
+        centers = ordered.map(o => new THREE.Vector3(o.center.x, o.center.y, o.center.z));
+        meshes = ordered.map(o => o.mesh).filter(m => !!m);
+    }
+
+    // Local function to resolve collisions, reused by ref and UI button
+    const resolveCollisionsLocal = (jaw = 'both') => {
+        try {
+            if (!ordered || ordered.length < 2) {
+                console.warn('Not enough teeth to resolve collisions');
+                return;
+            }
+            const result = SpaseCollisionResolver(meshes, centers);
+            const optimizedCenters = result.centers || centers;
+            // Применить новые позиции к orthoData
+            setOrthoData(prev => {
+                if (!prev || !prev.Staging || !prev.Staging[stage]) return prev;
+                const newOrthoData = { ...prev, Staging: [...prev.Staging] };
+                const newStage = { ...newOrthoData.Staging[stage], RelativeToothTransforms: { ...newOrthoData.Staging[stage].RelativeToothTransforms } };
+                ordered.forEach((o, i) => {
+                    const toothId = o.id;
+                    const prevTransform = newStage.RelativeToothTransforms[toothId] || {};
+                    newStage.RelativeToothTransforms[toothId] = {
+                        ...prevTransform,
+                        translation: { x: optimizedCenters[i].x, y: optimizedCenters[i].y, z: optimizedCenters[i].z }
+                        // rotation: prevTransform.rotation // оставляем прежний quaternion
+                    };
+                });
+                newOrthoData.Staging[stage] = newStage;
+                return newOrthoData;
+            });
+        } catch (err) {
+            console.error('resolveCollisions failed', err);
+        }
+    };
+
+    // Expose API to parent via ref: resolveCollisions(jaw)
+    useImperativeHandle(ref, () => ({
+        resolveCollisions: resolveCollisionsLocal
+    }));
+
     return (
+        <>
         <group onClick={handleCanvasClick}>
+            {/* Debug visualization: lines between centers, color for colliding pairs, and bounding boxes */}
+            {centers && centers.length > 1 && (
+                <>
+                    {centers.map((c, i) => {
+                        if (i === centers.length - 1) return null;
+                        const c2 = centers[i + 1];
+                        const dist = c.distanceTo(c2);
+                        const color = dist < 10 ? 'red' : 'green';
+                        return (
+                            <line key={`debug-line-${i}`}
+                                geometry={new THREE.BufferGeometry().setFromPoints([c, c2])}
+                            >
+                                <lineBasicMaterial attach="material" color={color} linewidth={2} />
+                            </line>
+                        );
+                    })}
+                    {centers.map((c, i) => (
+                        <mesh key={`debug-center-${i}`} position={c}>
+                            <sphereGeometry args={[0.5, 8, 8]} />
+                            <meshBasicMaterial color="yellow" />
+                        </mesh>
+                    ))}                    
+                </>
+            )}
             {validToothIDs.map((toothID) => (
                 (showMode === 0 && toothID < 30) ||
                 (showMode === 1 && toothID > 30) ||
@@ -261,5 +328,16 @@ export const ToothPlacement = forwardRef((props, ref) => {
                 ) : null
             ))}
         </group>
+        <Html fullscreen>
+            <div style={{ position: 'absolute', top: 112, left: 14, zIndex: 2000 }}>
+                <button
+                    onClick={() => resolveCollisionsLocal('maxilla')}
+                    style={{ padding: '8px 12px', borderRadius: 6, border: 'none', background: '#1976d2', color: 'white', cursor: 'pointer', boxShadow: '0 2px 6px rgba(0,0,0,0.2)'}}
+                >
+                    Resolve Upper Jaw
+                </button>
+            </div>
+        </Html>
+        </>
     );
 });

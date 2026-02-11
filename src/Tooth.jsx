@@ -8,7 +8,7 @@ import { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { useToothTransform } from "./useToothTransform";
 import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
-import { MeshBVH } from "three-mesh-bvh";
+import { MeshBVH, MeshBVHHelper } from "three-mesh-bvh";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader";
 import { TextureLoader } from "three/src/loaders/TextureLoader";
 import {
@@ -87,6 +87,7 @@ export function Tooth(props) {
   } = props;
 
   const [hovered, hover] = useState(false);
+  const [debugBVH, setDebugBVH] = useState(true);
   // Removed old toothRef declaration; now provided by useToothTransform
 
   // Use custom hook for mesh loading
@@ -121,6 +122,44 @@ export function Tooth(props) {
     return new MeshBVH(mergedGeometry);
   }, [mergedGeometry]);
 
+  // attach boundsTree to geometry for external intersection checks
+  useEffect(() => {
+    if (mergedGeometry && bvh) {
+      try {
+        mergedGeometry.boundsTree = bvh;
+      } catch (e) {
+        // ignore if cannot attach
+      }
+    }
+  }, [mergedGeometry, bvh]);
+
+  // Create MeshBVH helper visualization when debugBVH is enabled
+  // useEffect(() => {
+  //   if (!mergedMeshRef?.current || !mergedGeometry || !mergedGeometry.boundsTree) return;
+  //   let helper = null;
+  //   if (!debugBVH) return;
+  //   try {
+  //     // Prefer MeshBVHHelper if available
+  //     helper = new MeshBVHHelper(mergedMeshRef.current);
+  //     if (helper) {
+  //       mergedMeshRef.current.add(helper);
+  //       if (typeof helper.update === 'function') helper.update();
+  //     }
+  //   } catch (err) {
+  //     console.warn('Could not create MeshBVH helper', err);
+  //   }
+  //   return () => {
+  //     try {
+  //       if (helper && mergedMeshRef.current) {
+  //         mergedMeshRef.current.remove(helper);
+  //         if (typeof helper.dispose === 'function') helper.dispose();
+  //       }
+  //     } catch (e) {
+  //       // ignore
+  //     }
+  //   };
+  // }, [mergedGeometry, bvh, debugBVH]);
+
   const crownMaterial = texture
     ? new THREE.MeshStandardMaterial({
         map: texture,
@@ -147,8 +186,11 @@ export function Tooth(props) {
     else return "white";
   }
 
-  const [meshCenter, setMeshCenter] = useState(new THREE.Vector3());
+  const [meshCenter, setMeshCenter] = useState(null);
+  const [worldCenter, setWorldCenter] = useState(null);
+  const mergedMeshRef = useRef();
 
+  // Always recalculate meshCenter and worldCenter when geometry or transform changes
   useEffect(() => {
     if (mergedGeometry) {
       const center = new THREE.Vector3();
@@ -157,10 +199,38 @@ export function Tooth(props) {
         if (mergedGeometry.boundingBox) {
           mergedGeometry.boundingBox.getCenter(center);
           setMeshCenter(center);
+          // compute world center using latest position/quaternion
+          if (position && quaternion) {
+            const wc = center.clone().applyQuaternion(quaternion).add(new THREE.Vector3(position.x, position.y, position.z));
+            setWorldCenter(wc);
+          } else {
+            setWorldCenter(center.clone());
+          }
         }
       }
     }
-  }, [mergedGeometry]);
+  }, [mergedGeometry, position, quaternion]);
+
+  // Register this tooth in sceneApi so the resolver can access geometry and centers
+  useEffect(() => {
+    if (!mergedGeometry || !worldCenter) return;
+    try {
+      // Attach BVH if available
+      if (bvh && mergedGeometry) mergedGeometry.boundsTree = bvh;
+      sceneApi.registerObject(toothID, {
+        mergedGeometry,
+        mesh: mergedMeshRef.current,
+        center: worldCenter,
+        position: { x: position.x, y: position.y, z: position.z },
+        quaternion: { x: quaternion.x, y: quaternion.y, z: quaternion.z, w: quaternion.w }
+      });
+    } catch (err) {
+      console.warn('Register tooth failed', toothID, err);
+    }
+    return () => {
+      sceneApi.unregisterObject(toothID);
+    };
+  }, [mergedGeometry, worldCenter, position, quaternion, bvh, toothID, mergedMeshRef.current]);
 
   // Log missing tooth info to console
   useEffect(() => {
@@ -230,37 +300,38 @@ export function Tooth(props) {
         <mesh
           geometry={crownGeometry}
           material={crownMaterial}
-          visible={true} // false for debug!!!!!
+          visible={!debugBVH} // false for debug!!!!!
         />
       )}
       {rootGeometry && (
         <mesh 
           geometry={rootGeometry} 
           material={rootMaterial} 
-          visible={true} // false for debug!!!!!
+          visible={!debugBVH} // false for debug!!!!!
           />
       )}
       {/* BVH is built from mergedGeometry, debug mesh with texture */}
-      {mergedGeometry && (
-        <mesh
-          geometry={mergedGeometry}
-          material={
-            texture
-              ? new THREE.MeshStandardMaterial({
-                  map: texture,
-                  color: 0xffffff,
-                  transparent: true,
-                  opacity: 1.0,
-                })
-              : new THREE.MeshStandardMaterial({
-                  color: 0xffffff,
-                  transparent: true,
-                  opacity: 1.0,
-                })
-          }
-          visible={false} // true for debug!!!!!
-        />
-      )}
+        {mergedGeometry && (
+          <mesh
+            ref={mergedMeshRef}
+            geometry={mergedGeometry}
+            material={
+              texture
+                ? new THREE.MeshStandardMaterial({
+                    map: texture,
+                    color: 0xffffff,
+                    transparent: true,
+                    opacity: debugBVH ? 0.4 : 1.0,
+                  })
+                : new THREE.MeshStandardMaterial({
+                    color: 0xffffff,
+                    transparent: true,
+                    opacity: debugBVH ? 0.4 : 1.0,
+                  })
+            }
+            visible={debugBVH} // true for debug!!!!!
+          />
+        )}
       <ToothNumberLabel toothID={toothID} />
       {showLandmarks && <LandmarksGroup landmarks={landmarks} />}
       {useShortRoots && showLandmarks && landmarks?.MRAPoint && meshCenter && (
@@ -268,9 +339,21 @@ export function Tooth(props) {
       )}
     </group>
   );
-  const [transformMode, setTransformMode] = useState("rotate");
+  const [transformMode, setTransformMode] = useState("translate"); //начальный вариант трансформ контрола
+  
+  // Add keyboard event handler for debug BVH toggle
+  useEffect (() => {
+    const handleDebugToggle = (event) => {
+      // if (!isClicked) return;
+      if (event.key.toLowerCase() === "b" || event.key.toLowerCase() === "и") {
+        setDebugBVH((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleDebugToggle);
+    return () => window.removeEventListener("keydown", handleDebugToggle);
+  }, []);
 
-  // Add keyboard event handler
+  // Add keyboard event handler for transform mode
   useEffect(() => {
     const handleKeyPress = (event) => {
       if (!isClicked) return;

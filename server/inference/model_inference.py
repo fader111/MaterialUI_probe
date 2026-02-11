@@ -77,23 +77,102 @@ class OrthoCaseDataLoader:
 
 
 class AutoencoderInference:
-    def __init__(self, checkpoint_path, num_teeth=28, num_points=5, coord_dim=3):
-        self.model = InitAutoencoder(num_teeth=num_teeth, num_points=num_points, coord_dim=coord_dim).to("cpu")
+    #(array([[[[ -70.1473, -115.0462,  -59.6392]]]], dtype=float32),
+    #array([[[[127.2449, 102.2844, 130.2199]]]], dtype=float32))
+    # внимание! размерность уменьшена на 1 - работаем без бачей. 
+    coords_min = np.array([[[-95.0, -121.0, -60.0]]], dtype=np.float32) 
+    coords_max = np.array([[[129.0, 102.0, 130.0]]], dtype=np.float32)
+
+    def __init__(self, 
+                checkpoint_path, 
+                num_teeth=28, 
+                num_points=5, 
+                coord_dim=3, 
+                feature_dim=1, 
+                normalize=False
+                ):
+        self.model = InitAutoencoder(num_teeth=num_teeth, 
+                                     num_points=num_points, 
+                                     coord_dim=coord_dim, 
+                                     feature_dim=feature_dim
+                                     ).to("cpu")
         state_dict = torch.load(checkpoint_path, map_location='cpu')
         self.model.load_state_dict(state_dict)
         self.model.eval().cpu()
         self.num_teeth = num_teeth
         self.num_points = num_points
         self.coord_dim = coord_dim
+        self.feature_dim = feature_dim
+        self.normalize = normalize
+        try:
+            coords_min = np.load(r'D:\projectsd\ML_setup_pipeline\ml_setup_pipeline\output\training\coords_min.npy')
+            coords_max = np.load(r'D:\projectsd\ML_setup_pipeline\ml_setup_pipeline\output\training\coords_max.npy')
+            self.coords_min = np.squeeze(coords_min)
+            self.coords_max = np.squeeze(coords_max)
+            print(f"min max points values \n{self.coords_min} \n{self.coords_max}")
+        except Exception as e:
+            print(f"[WARN] Could not load coords_min/max from file, using defaults. Error: {e}")
+
+    def _normalize(self, x, feature_dim=1):
+        coords = x[..., :3]
+        features = x[..., 3:] if feature_dim > 0 else None
+        norm_coords = (coords - self.coords_min) / (self.coords_max - self.coords_min + 1e-8)
+        if features is not None:
+            norm_x = np.concatenate([norm_coords, features], axis=-1)
+        else:
+            norm_x = norm_coords
+        return torch.from_numpy(norm_x).float()
+
+    def _denormalize(self, x, feature_dim=0):
+        coords = x[..., :3]
+        features = x[..., 3:] if feature_dim > 0 else None
+        coords = coords * (self.coords_max - self.coords_min + 1e-8) + self.coords_min
+        if features is not None: # no needs actually - always None
+            x = np.concatenate([coords, features], axis=-1)
+        else:
+            x = coords
+        return x
+    
     def predict(self, rt_points_t1, rt_points_t2):
         x_tensor = torch.from_numpy(rt_points_t1).float().unsqueeze(0)
+        if self.feature_dim ==1:
+            # convert x_tensor to shape (B, num_teeth, num_points, coord_dim)
+            x_tensor = x_tensor.view(1, self.num_teeth, self.num_points, self.coord_dim)
+            # add zeros to each point for feature dimension if imitate unmovable teeth, 
+            # ones for all movable
+            movable_feat = torch.ones((1, self.num_teeth, self.num_points, 1))
+            # movable_feat = torch.zeros((1, self.num_teeth, self.num_points, 1)) # метки всех зубов неподвижные
+            # movable_feat[0, :1, :, 0] = 0.0  # first n teeth (37...) are unmovable
+
+            x_tensor = torch.cat([x_tensor, movable_feat], dim=-1)
+        
+        if self.normalize:
+            x_tensor = self._normalize(x_tensor.cpu().numpy(), feature_dim=self.feature_dim)
+        else:
+            x_tensor = x_tensor.cpu()
+
+        print(f"x_tensor.shape {x_tensor.shape}")
         y_tensor = torch.from_numpy(rt_points_t2).float().unsqueeze(0)
+        if self.normalize:
+            y_tensor = self._normalize(y_tensor.cpu().numpy(), feature_dim=self.feature_dim)
+        else:
+            y_tensor = y_tensor.cpu()
+
+        print(f"y_tensor.shape {y_tensor.shape}")
         with torch.no_grad():
             predictions = self.model(x_tensor)
             loss = torch.nn.L1Loss()(predictions, y_tensor)
-        return predictions.squeeze(0).cpu().detach().numpy(), loss.item()
+        # return predictions.squeeze(0).cpu().detach().numpy(), loss.item()
+        predictions = predictions.squeeze(0).cpu().detach().numpy()
+        
+        if self.normalize:
+            predictions = self._denormalize(predictions, feature_dim=0)    
+        
+        print(f"Init Predict loss Item {loss.item():.4f}")        
+        return predictions, loss.item()
+    
 
-class ArchRegressorInference:
+class ArchRegressorInference:    
     def __init__(self, 
                  checkpoint_path, 
                  num_teeth=28, 
@@ -108,6 +187,7 @@ class ArchRegressorInference:
         self.num_teeth = num_teeth
         self.num_points = num_points
         self.coord_dim = coord_dim
+
     def predict(self, ae_pred, template, targets=None):
         ae_pred_tensor = torch.from_numpy(ae_pred).float().unsqueeze(0)
         template_tensor = torch.from_numpy(template).float().unsqueeze(0)
@@ -123,7 +203,7 @@ class ArchRegressorInference:
 
 class OrthoInferencePipeline:
     def __init__(self, ae_ckpt, reg_ckpt=None):
-        self.ae = AutoencoderInference(ae_ckpt)
+        self.ae = AutoencoderInference(ae_ckpt, feature_dim=0, normalize=False)
         self.reg = ArchRegressorInference(reg_ckpt) if reg_ckpt else None
 
     def _compose_transforms_from_points(self, base_loader: OrthoCaseDataLoader, prediction_points, base_case_points_t1) -> Dict[str, Dict[str, Any]]:
@@ -324,13 +404,14 @@ class OrthoInferencePipeline:
 
 if __name__ == "__main__":
     # Example usage with new SOLID pipeline
-    base_case_path = os.path.join("server", "00000000.oas")
+    # base_case_path = os.path.join("server", "00000000.oas")
+    base_case_path = os.path.join("server", "112162.oas")
     template_case_path = os.path.join("server", "00000000.oas")
     ae_ckpt = "server/inference/init_ae/best_model.pth"
     reg_ckpt = "server/inference/arch_regressor/best_model.pth"
     pipeline = OrthoInferencePipeline(ae_ckpt, reg_ckpt)
     transforms = pipeline.run_t2_predict(base_case_path, template_case_path)
-    # transforms = pipeline.run_init_predict(base_case_path)
+    # transforms = pipeline.run_init_predict()
     print("Transforms for tooth 37:")
     print(json.dumps(transforms['37'], indent=2, ensure_ascii=False))
     # Optionally print all transforms or debug info

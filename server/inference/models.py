@@ -44,13 +44,19 @@ class InitAutoencoder_4layers(nn.Module):
         return decoded
     
 class InitAutoencoder(nn.Module):
-    def __init__(self, num_teeth: int = 28, num_points: int = 5, coord_dim: int = 3):
+    def __init__(self, 
+                 num_teeth: int = 28, 
+                 num_points: int = 5, 
+                 coord_dim: int = 3, 
+                 feature_dim: int = 0
+                 ):
         super().__init__()
         self.num_teeth = num_teeth
         self.num_points = num_points
         self.coord_dim = coord_dim
-        self.dense_dim = num_teeth * num_points * coord_dim
-        self.dense_dim2 = round(self.dense_dim//1.5) #1.5
+        self.dense_dim_in = num_teeth * num_points * (coord_dim + feature_dim)
+        self.dense_dim_out = num_teeth * num_points * coord_dim 
+        self.dense_dim2 = round(self.dense_dim_in//1.5) #1.5
         self.dense_dim3 = round(self.dense_dim2//2)
         self.dim_code = round(self.dense_dim3//2)
         # self.dim_code = self.dense_dim // 6
@@ -59,7 +65,7 @@ class InitAutoencoder(nn.Module):
         self.encoder = nn.Sequential(
             # nn.Linear(self.dense_dim, self.dense_dim),
             # nn.ELU(),
-            nn.Linear(self.dense_dim, self.dense_dim2),
+            nn.Linear(self.dense_dim_in, self.dense_dim2),
             nn.ELU(),
             nn.Linear(self.dense_dim2, self.dense_dim3),
             nn.ELU(),
@@ -72,7 +78,7 @@ class InitAutoencoder(nn.Module):
             nn.ELU(),
             nn.Linear(self.dense_dim3, self.dense_dim2),
             nn.ELU(),
-            nn.Linear(self.dense_dim2, self.dense_dim)
+            nn.Linear(self.dense_dim2, self.dense_dim_out)
             # nn.ELU(),
             # nn.Linear(self.dense_dim, self.dense_dim)
         )
@@ -86,6 +92,7 @@ class InitAutoencoder(nn.Module):
         # Reshape back to original dimensions
         decoded = decoded.view(-1, self.num_teeth, self.num_points, self.coord_dim)
         return decoded
+ 
  
 class ArchFormRegressor(nn.Module):
     def __init__(self, num_teeth: int = 28, 

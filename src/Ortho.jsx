@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect, useMemo, useCallback, Suspense} from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { TrackballControls } from '@react-three/drei'
+import { TrackballControls, Text } from '@react-three/drei'
 import * as THREE from 'three'
 import CombinedTransformControls from './CombinedTransformControls'
 // import NativeCombinedTransformControls from './NativeCombinedTransformControls'
@@ -242,7 +242,10 @@ export default function Ortho(props) {
             <Suspense fallback={<div>Loading...</div>} />
             <ambientLight intensity={0.3} />
             {camera && <CameraFollowingLight camera={camera} />}
-            <axesHelper args={[5]} />
+            <axesHelper args={[3]} />
+            <Text position={[3.2, 0, 0]} fontSize={0.3} color="red"> X </Text>
+            <Text position={[0, 3.2, 0]} fontSize={0.3} color="green"> Y </Text>
+            <Text position={[0, 0, 3.2]} fontSize={0.3} color="blue"> Z </Text>
             <ToothPlacement
               ref={toothPlacementRef}
               orthoData={orthoData}

@@ -31,3 +31,4 @@ server/inference/__pycache__/*
 server/inference/__pycache__/model_inference.cpython-312.pyc
 server/__pycache__/api.cpython-312.pyc
 public/orthoData.json
+server/*.oas

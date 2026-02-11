@@ -292,6 +292,8 @@ export default function Overlay({ children, stage, maxStage, onStageChange, onVi
   const cmdManagerRef = React.useRef(null)
   const [historyTick, setHistoryTick] = React.useState(0)
 
+  maxStage = 1; // заглушка для работы слайдера без стейджинга !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  
   // Listen for mesh/data reload completion from Ortho
   React.useEffect(() => {
     // Only clear loading if we are actually loading (not on every children change)
@@ -501,6 +503,7 @@ export default function Overlay({ children, stage, maxStage, onStageChange, onVi
               value={typeof stage === 'number' ? stage : 0}
               min={0}
               max={typeof maxStage === 'number' && maxStage > 0 ? maxStage : 1}
+              // max={1}
               step={1}
               // step={maxStage}
               onChange={(_, v) => onStageChange && onStageChange(v)}
@@ -509,6 +512,7 @@ export default function Overlay({ children, stage, maxStage, onStageChange, onVi
             />
           </Box>
           <IconButton size="small" onClick={() => onStageChange && onStageChange(maxStage)} disabled={stage === maxStage}>
+          {/* <IconButton size="small" onClick={() => onStageChange && onStageChange(1)} disabled={stage === 1}> */}
             <ArrowRightIcon sx={{ fontSize: 40, color: 'rgba(13, 97, 175, 0.99)' }}  />
           </IconButton>
         </Box>

@@ -41,6 +41,25 @@ up_teeth_nums14 = [17, 16, 15, 14, 13, 12, 11, 21, 22,
                     23, 24, 25, 26, 27]  
 dw_teeth_nums14 = [37, 36, 35, 34, 33, 32, 31, 41, 42,
                     43, 44, 45, 46, 47] 
+stub_missing_tooth_landmarks = \
+                {
+                    "MDWLine": {
+                        "start": {"x": "0","y": "0","z": "0"},
+                        "end": {"x": "0","y": "0","z": "0"}
+                    },
+                    "BCPoint": {"x": "0","y": "0","z": "0"},
+                    "MRAPoint": {"x": "0","y": "0","z": "0"},
+                    "FEGJPoint": {"x": "0","y": "0","z": "0"},
+                    "BRLine": {
+                        "start": {"x": "0","y": "0","z": "0"},
+                        "end": {"x": "0","y": "0","z": "0"}
+                    }
+                }
+stub_missing_tooth_rt = \
+                {
+                    "translation": {"x": "0","y": "0","z": "0"},
+                    "rotation": {"x": "0","y": "0","z": "0","w": "1"}
+                }
 
 def register_resolvers() -> None:
     """Register custom OmegaConf resolvers for project configuration"""
@@ -508,7 +527,7 @@ def case_landmark_grids_orgins(ortho_data):
     combined_vector = np.zeros((num_teeth, points_per_tooth, coordinates_per_point), dtype=np.float32)
 
     for tooth_index, tooth_id in enumerate(dw_teeth_nums14 + up_teeth_nums14):
-        landmarks = ortho_data["Staging"][0]["Landmarks"][str(tooth_id)]
+        landmarks = ortho_data["Staging"][0]["Landmarks"].get(str(tooth_id), stub_missing_tooth_landmarks)
         # grid_from_landmarks logic (5 points: 2 from MDWLine, 1 each from BCPoint, MeanRootApex, FEGJPoint)
         grid = []
         MDWLine = landmarks["MDWLine"]
@@ -525,6 +544,8 @@ def case_landmark_grids_orgins(ortho_data):
 def case_landmark_grids(ortho_data):
     """
     Extracts landmark grids for both jaws from an OrthoCase object.
+    If buccal ridge points are present, use them for inference, 
+        if not(zeros there) use MDWLine points instead.
     Returns:
         rt_points_t1: np.ndarray of shape (28, 5, 3) for T1
         rt_points_t2: np.ndarray of shape (28, 5, 3) for T2
@@ -544,13 +565,24 @@ def case_landmark_grids(ortho_data):
         # teeth_nums = dw_teeth_nums14 if jawType == JawType.Mandible else up_teeth_nums14
 
     for tooth_index, tooth_id in enumerate(dw_teeth_nums14 + up_teeth_nums14):
-        # tooth = jaw.getToothByID(tooth_id)
-        landmarks = ortho_data["Staging"][0]["Landmarks"][str(tooth_id)]
+        
+        def has_zero(line):
+            """Проверяем, есть ли нули в координатах линии"""
+            for point in ["start", "end"]:
+                for coord in ["x", "y", "z"]:
+                    if float(line[point][coord]) == 0.0:
+                        return True
+            return False
+        
+        # tooth = jaw.getToothByID(tooth_id)  
+        landmarks = ortho_data["Staging"][0]["Landmarks"].get(str(tooth_id), stub_missing_tooth_landmarks)
         # grid_from_landmarks logic (5 points: 2 from MDWLine, 1 each from BCPoint, MeanRootApex, FEGJPoint)
         grid = []
-        MDWLine = landmarks["MDWLine"]
-        grid.append([MDWLine["start"]["x"], MDWLine["start"]["y"], MDWLine["start"]["z"]])
-        grid.append([MDWLine["end"]["x"], MDWLine["end"]["y"], MDWLine["end"]["z"]])
+        FirstLine = landmarks["BRLine"] if not has_zero(landmarks["BRLine"]) else landmarks["MDWLine"]
+        # print(f"use {"BRLine" if not has_zero(landmarks["BRLine"]) else "MDWLine"} for tooth {tooth_id}")
+
+        grid.append([FirstLine["start"]["x"], FirstLine["start"]["y"], FirstLine["start"]["z"]])
+        grid.append([FirstLine["end"]["x"], FirstLine["end"]["y"], FirstLine["end"]["z"]])
         for lm in ["BCPoint", "MRAPoint", "FEGJPoint"]:
             point = landmarks[lm]
             grid.append([point["x"], point["y"], point["z"]])
@@ -558,8 +590,8 @@ def case_landmark_grids(ortho_data):
 
         # t2 = int(ortho_data["T2Stage"]) - 1
         t2 = int(ortho_data["T2Stage"])
-        tooth_rt_t1 = ortho_data["Staging"][0]["RelativeToothTransforms"][str(tooth_id)]
-        tooth_rt_t2 = ortho_data["Staging"][t2]["RelativeToothTransforms"][str(tooth_id)]
+        tooth_rt_t1 = ortho_data["Staging"][0]["RelativeToothTransforms"].get(str(tooth_id), stub_missing_tooth_rt)
+        tooth_rt_t2 = ortho_data["Staging"][-1]["RelativeToothTransforms"].get(str(tooth_id), stub_missing_tooth_rt)
         tr_matrix_t1 = get_transform_matrix(tooth_rt_t1)
         tr_matrix_t2 = get_transform_matrix(tooth_rt_t2)
         rt_points_t1 = apply_rigid_transform(grid_0, tr_matrix_t1)
